@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -23,13 +25,16 @@ func parseArgs() (*options, error) {
 	flag.StringVar(&opts.inputFolder, "i", "./", "Directory where raw files live")
 	flag.StringVar(&opts.outputFolder, "o", "./", "Directory where jpgs go")
 	flag.StringVar(&opts.extension, "e", ".arw", "Extension of raw files")
-	flag.StringVar(&opts.command, "c", "flatpak run --command='darktable-cli' org.darktable.Darktable", "Darktable command or binary")
+	flag.StringVar(&opts.command, "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
 	flag.Parse()
-	//args := flag.Args()
-	//if len(args) < 1 {
-	//	return &options{}, fmt.Errorf("expecting at least 1 arg (secret_name), found %d", len(args))
-	//}
 	return &opts, nil
+}
+
+type exportParams struct {
+	command    string
+	rawPath    string
+	xmpPath    string
+	outputPath string
 }
 
 func main() {
@@ -43,8 +48,30 @@ func main() {
 		fmt.Println(raw)
 		// Find adjacent xmp files
 		xmps := findXmps(raw)
-		for _, xmp := range xmps {
-			fmt.Println("  ", xmp)
+		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
+		relativeDir := strings.TrimPrefix(filepath.Dir(raw), opts.inputFolder)
+		outputPath := filepath.Join(opts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
+		params := exportParams{
+			command:    opts.command,
+			rawPath:    raw,
+			outputPath: outputPath,
+		}
+		if len(xmps) == 0 {
+			fmt.Println("No xmp files found, applying default settings")
+			export(params)
+		} else {
+			for _, xmp := range xmps {
+				fmt.Println("  ", xmp)
+				// Export the RAW file
+				params.xmpPath = xmp
+				jpgFilename := getJpgFilename(xmp, opts.extension)
+				outputPath, err := filepath.Abs(filepath.Join(opts.outputFolder, relativeDir, jpgFilename))
+				if err != nil {
+					log.Fatalf("Error getting jpg path: %v", err)
+				}
+				params.outputPath = outputPath
+				export(params)
+			}
 		}
 	}
 	// Look for xmp file(s) for the raw file
@@ -52,6 +79,38 @@ func main() {
 	// Run darktable cli, setting export path to match structure of input dir
 	//  darktable-cli [<input file or dir>] [<xmp file>] <output destination> [options] [--core <darktable options>]
 	fmt.Println("\nComplete")
+}
+
+func getJpgFilename(xmpPath string, extension string) string {
+	basename := strings.TrimSuffix(filepath.Base(xmpPath), filepath.Ext(xmpPath))
+	// _DSC1234_01.ARW.xmp -> _DSC1234_01.ARW.jpg
+	// remove extra extension suffix, or not?
+	exp := regexp.MustCompile(fmt.Sprintf(`(?i)(.*)%s(.*)`, extension))
+	jpgBasename := exp.ReplaceAllString(basename, "${1}${2}")
+	return fmt.Sprintf("%s.jpg", jpgBasename)
+
+}
+
+func export(params exportParams) {
+	//cmd := exec.Command("echo", params.rawPath, ":", params.xmpPath, "->", params.outputPath)
+	args := strings.Fields(params.command)
+	args = append(args, params.rawPath)
+	if params.xmpPath != "" {
+		args = append(args, params.xmpPath)
+	}
+	args = append(args, params.outputPath)
+	remaining := args[1:]
+	//cmd := exec.Command("echo", remaining...)
+	fmt.Println(args)
+	fmt.Println(len(args))
+	cmd := exec.Command(args[0], remaining...)
+	//cmd = exec.Command("echo", args...)
+	stdout, err := cmd.CombinedOutput()
+	fmt.Println("stdout", string(stdout))
+	if err != nil {
+		fmt.Println("error", err.Error())
+		fmt.Println("err", err)
+	}
 }
 
 func findRaws(folder, extension string) []string {
