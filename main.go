@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -81,10 +83,10 @@ func main() {
 	fmt.Println("\nComplete")
 }
 
+// _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg
 func getJpgFilename(xmpPath string, extension string) string {
 	basename := strings.TrimSuffix(filepath.Base(xmpPath), filepath.Ext(xmpPath))
-	// _DSC1234_01.ARW.xmp -> _DSC1234_01.ARW.jpg
-	// remove extra extension suffix, or not?
+	// remove extra extension suffix
 	exp := regexp.MustCompile(fmt.Sprintf(`(?i)(.*)%s(.*)`, extension))
 	jpgBasename := exp.ReplaceAllString(basename, "${1}${2}")
 	return fmt.Sprintf("%s.jpg", jpgBasename)
@@ -92,6 +94,10 @@ func getJpgFilename(xmpPath string, extension string) string {
 }
 
 func export(params exportParams) {
+	err := deleteJpgIfExists(params.outputPath)
+	if err != nil {
+		log.Fatalf("Error deleting jpg: %v", err)
+	}
 	//cmd := exec.Command("echo", params.rawPath, ":", params.xmpPath, "->", params.outputPath)
 	args := strings.Fields(params.command)
 	args = append(args, params.rawPath)
@@ -111,6 +117,22 @@ func export(params exportParams) {
 		fmt.Println("error", err.Error())
 		fmt.Println("err", err)
 	}
+}
+
+func deleteJpgIfExists(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		fmt.Printf("Found existing jpg at target path. removing %s\n", path)
+		e := os.Remove(path)
+		if e != nil {
+			return e
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file doesn't exist, nothing to delete
+		return nil
+	} else {
+		return err
+	}
+	return nil
 }
 
 func findRaws(folder, extension string) []string {
