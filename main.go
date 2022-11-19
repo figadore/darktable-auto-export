@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/peterbourgon/ff/v3/ffcli"
 	"gopkg.in/yaml.v3"
 )
 
@@ -59,6 +61,29 @@ func parseConfig() Config {
 }
 
 func main() {
+	if err := run(os.Args); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(args []string) error {
+	rootFlagSet := flag.NewFlagSet("dae", flag.ExitOnError)
+	dirSyncCmd := &ffcli.Command{
+		Name: "dirSync",
+		Exec: dirSync,
+	}
+	rootCmd := &ffcli.Command{
+		FlagSet: rootFlagSet,
+		//ShortUsage: "dae [flags] <subcommand>"
+		Subcommands: []*ffcli.Command{dirSyncCmd},
+	}
+	return rootCmd.ParseAndRun(context.Background(), os.Args[1:])
+}
+
+func dirSync(ctx context.Context, args []string) error {
+	fmt.Println("running dirsync")
+	return nil
 	opts, err := parseArgs()
 	if err != nil {
 		log.Fatalf("Error parsing args: %v", err)
@@ -110,6 +135,10 @@ func main() {
 	// Run darktable cli, setting export path to match structure of input dir
 	//  darktable-cli [<input file or dir>] [<xmp file>] <output destination> [options] [--core <darktable options>]
 	fmt.Println("\nComplete")
+	return nil
+}
+
+func exportDir() {
 }
 
 func deleteJpgs(jpgs []string) {
