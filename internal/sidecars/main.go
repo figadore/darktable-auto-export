@@ -1,4 +1,4 @@
-package main
+package sidecars
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-func findJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension string) []string {
+func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension string) []string {
 	var jpgsToDelete []string
 	for _, jpg := range jpgs {
 		relativeDir := strings.TrimPrefix(filepath.Dir(jpg), outputFolder)
@@ -30,7 +30,7 @@ func findJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension s
 }
 
 // _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg
-func getJpgFilename(xmpPath string, extension string) string {
+func GetJpgFilename(xmpPath string, extension string) string {
 	basename := strings.TrimSuffix(filepath.Base(xmpPath), filepath.Ext(xmpPath))
 	// remove extra extension suffix
 	// FIXME allow _DSC1234.xmp format as well (used by adobe and others)
@@ -51,7 +51,7 @@ func getRawFilename(jpgPath string, extension string) string {
 	return fmt.Sprintf("%s%s", jpgBasename, extension)
 }
 
-func findFilesWithExt(folder, extension string) []string {
+func FindFilesWithExt(folder, extension string) []string {
 	var raws []string
 	err := filepath.WalkDir(folder, func(path string, info fs.DirEntry, e error) error {
 		if e != nil {
@@ -69,7 +69,7 @@ func findFilesWithExt(folder, extension string) []string {
 }
 
 // May be more efficient to enumerate once and deal with strings from then on
-func findXmps(rawPath string) []string {
+func FindXmps(rawPath string) []string {
 	var xmps []string
 	base := strings.TrimSuffix(filepath.Base(rawPath), filepath.Ext(rawPath))
 	ext := filepath.Ext(rawPath)
@@ -149,4 +149,22 @@ func findRaw(jpgPath string) []string {
 		log.Fatal(err)
 	}
 	return xmps
+}
+
+// DeleteJpgIfExists is what enables jpgs to be replaced rather than appended
+// The darktable cli does not overwrite jpgs, it creates new ones every time it is run
+func DeleteJpgIfExists(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		fmt.Printf("Found existing jpg at target path. removing %s\n", path)
+		e := os.Remove(path)
+		if e != nil {
+			return e
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file doesn't exist, nothing to delete
+		return nil
+	} else {
+		return err
+	}
+	return nil
 }
