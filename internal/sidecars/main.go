@@ -15,8 +15,8 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension s
 	var jpgsToDelete []string
 	for _, jpg := range jpgs {
 		relativeDir := strings.TrimPrefix(filepath.Dir(jpg), outputFolder)
-		rawFilenameLower := getRawFilename(jpg, strings.ToLower(rawExtension))
-		rawFilenameUpper := getRawFilename(jpg, strings.ToUpper(rawExtension))
+		rawFilenameLower := GetRawFilenameForJpg(jpg, strings.ToLower(rawExtension))
+		rawFilenameUpper := GetRawFilenameForJpg(jpg, strings.ToUpper(rawExtension))
 		rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
 		rawPathUpper := filepath.Join(inputFolder, relativeDir, rawFilenameUpper)
 		// Check for the uppercase and lowercase version of the raw extension
@@ -41,7 +41,7 @@ func GetJpgFilename(xmpPath string, extension string) string {
 }
 
 // _DSC1234_01.jpg -> _DSC1234.ARW
-func getRawFilename(jpgPath string, extension string) string {
+func GetRawFilenameForJpg(jpgPath string, extension string) string {
 	// Remove directory and extension
 	basename := strings.TrimSuffix(filepath.Base(jpgPath), filepath.Ext(jpgPath))
 	// remove sidecar duplicates suffix (e.g. _01) if it exists
@@ -49,6 +49,18 @@ func getRawFilename(jpgPath string, extension string) string {
 	exp := regexp.MustCompile(`(.*)_\d\d`)
 	jpgBasename := exp.ReplaceAllString(basename, "${1}")
 	return fmt.Sprintf("%s%s", jpgBasename, extension)
+}
+
+// /some/dir/_DSC1234_01.xmp -> /some/dir/_DSC1234.ARW
+// /some/dir/_DSC1234_01.ARW.xmp -> /some/dir/_DSC1234.ARW
+func GetRawPathForXmp(xmpPath string, extension string) string {
+	// Remove xmp extension
+	basename := strings.TrimSuffix(xmpPath, filepath.Ext(xmpPath))
+	// Remove sidecar duplicates suffix (e.g. _01) if it exists
+	// Also strip out the raw extension if it exists
+	exp := regexp.MustCompile(fmt.Sprintf(`(.*?)(?:_\d{2})?(?:%s)?`, extension))
+	xmpBasename := exp.ReplaceAllString(basename, "${1}")
+	return fmt.Sprintf("%s%s", xmpBasename, extension)
 }
 
 func FindFilesWithExt(folder, extension string) []string {

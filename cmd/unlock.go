@@ -7,6 +7,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -24,7 +25,12 @@ is definitely not in use.`,
 
 func init() {
 	rootCmd.AddCommand(unlockCmd)
-	unlockCmd.Flags().StringVarP(&unlockOpts.lockDir, "lockdir", "", "~/.var/app/org.darktable.Darktable/config/darktable/", "Directory where darktable lock files are kept. Often ~/.config/darktable for local installations")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Unable to read home directory")
+	}
+	defaultConfigDir := filepath.Join(home, ".var/app/org.darktable.Darktable/config/darktable/")
+	unlockCmd.Flags().StringVarP(&unlockOpts.lockDir, "lockdir", "", defaultConfigDir, "Directory where darktable lock files are kept. Often ~/.config/darktable for local installations")
 }
 
 var unlockOpts unlockOptions
