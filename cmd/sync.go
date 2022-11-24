@@ -19,9 +19,10 @@ var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Export jpgs for raw files",
 	Long: `Export jpgs for raw files
-Given a directory, all raw files and/or xmp files will produce a jpg.
-Given a raw file, any corresponding xmp will produce a jpg.
-Given a xmp file, a single jpg will be produced.`,
+Given a directory with just raw files, a jpg will be produced for each raw
+Given a directory with raw and xmp files, a jpg will be produced for each raw/xmp combination
+Given a raw file, a jpg will be produced for each raw/xmp combination
+Given a xmp file, a single jpg will be produced for the matching raw`,
 	RunE: sync,
 }
 
@@ -149,14 +150,13 @@ func syncFile(path string) error {
 		fmt.Println("Syncing xmp")
 		raw := sidecars.GetRawPathForXmp(xmp, syncOpts.extension)
 		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-		relativeDir := strings.TrimPrefix(filepath.Dir(raw), syncOpts.inputPath)
+		relativeDir := filepath.Dir(strings.TrimPrefix(syncOpts.inputPath, filepath.Dir(raw)))
 		outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
 		params := darktable.ExportParams{
 			Command:    syncOpts.command,
 			RawPath:    raw,
 			OutputPath: outputPath,
 		}
-		fmt.Println("  ", xmp)
 		// Export the RAW file
 		params.XmpPath = xmp
 		jpgFilename := sidecars.GetJpgFilename(xmp, syncOpts.extension)

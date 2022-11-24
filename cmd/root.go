@@ -14,10 +14,8 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "darktable-auto-export",
 	Short: "Use darktable to export jpgs from raw image files",
-	Long: `This is the longer description
-But I don't know what to put here yet
-
-Maybe a riddle? What's as fast as light but as slow as a snail?`,
+	Long: `Export jpgs for each raw/xmp using darktable
+Optionally clear jpgs for missing raws/xmps`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
