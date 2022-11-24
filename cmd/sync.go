@@ -17,13 +17,11 @@ import (
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Export jpgs for raw files",
+	Long: `Export jpgs for raw files
+Given a directory, all raw files and/or xmp files will produce a jpg.
+Given a raw file, any corresponding xmp will produce a jpg.
+Given a xmp file, a single jpg will be produced.`,
 	RunE: sync,
 }
 
@@ -72,7 +70,6 @@ func parseConfig() Config {
 }
 
 func sync(cmd *cobra.Command, args []string) error {
-	fmt.Println("sync called")
 	// Check whether input arg is a directory or an xmp file
 	file, err := os.Open(syncOpts.inputPath)
 	if err != nil {
@@ -97,29 +94,11 @@ func sync(cmd *cobra.Command, args []string) error {
 }
 
 func syncDir() error {
-	// Recurse through input directory
+	// Recurse through input directory looking for finding raw files
 	raws := sidecars.FindFilesWithExt(syncOpts.inputPath, syncOpts.extension)
 	config := parseConfig()
 	for _, raw := range raws {
-		fmt.Println(raw)
-		// Find adjacent xmp files
-		xmps := sidecars.FindXmps(raw)
-		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-		relativeDir := strings.TrimPrefix(filepath.Dir(raw), syncOpts.inputPath)
-		outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
-		params := darktable.ExportParams{
-			Command:    syncOpts.command,
-			RawPath:    raw,
-			OutputPath: outputPath,
-		}
-		if len(xmps) == 0 {
-			fmt.Println("No xmp files found, applying default settings")
-			darktable.Export(params)
-		} else {
-			for _, xmp := range xmps {
-				syncFile(xmp)
-			}
-		}
+		syncRaw(raw)
 	}
 	// Delete jpgs for missing raws
 	if config.DeleteMissing == "true" {
@@ -138,9 +117,33 @@ func syncDir() error {
 	return nil
 }
 
+func syncRaw(raw string) {
+	fmt.Println("Syncing raw", raw)
+	// Find adjacent xmp files
+	xmps := sidecars.FindXmps(raw)
+	basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
+	relativeDir := strings.TrimPrefix(filepath.Dir(raw), syncOpts.inputPath)
+	outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
+	params := darktable.ExportParams{
+		Command:    syncOpts.command,
+		RawPath:    raw,
+		OutputPath: outputPath,
+	}
+	if len(xmps) == 0 {
+		fmt.Println("No xmp files found, applying default settings")
+		darktable.Export(params)
+	} else {
+		for _, xmp := range xmps {
+			fmt.Println("Sync xmp file", xmp)
+			syncFile(xmp)
+		}
+	}
+}
+
 // syncFile takes the path to a raw file or xmp and exports jpgs
 func syncFile(path string) error {
-	switch ext := filepath.Ext(syncOpts.inputPath); {
+	//switch ext := filepath.Ext(syncOpts.inputPath); {
+	switch ext := filepath.Ext(path); {
 	case ext == ".xmp":
 		xmp := path
 		fmt.Println("Syncing xmp")
@@ -164,7 +167,8 @@ func syncFile(path string) error {
 		params.OutputPath = outputPath
 		darktable.Export(params)
 	case strings.EqualFold(ext, syncOpts.extension):
-		fmt.Println("Syncing raw file")
+		fmt.Println("Syncing raw file with extension", ext, ":", path)
+		syncRaw(path)
 	default:
 		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, syncOpts.extension))
 	}
