@@ -14,7 +14,7 @@ import (
 func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension string) []string {
 	var jpgsToDelete []string
 	for _, jpg := range jpgs {
-		relativeDir := strings.TrimPrefix(filepath.Dir(jpg), outputFolder)
+		relativeDir := GetRelativeDir(jpg, outputFolder)
 		rawFilenameLower := GetRawFilenameForJpg(jpg, strings.ToLower(rawExtension))
 		rawFilenameUpper := GetRawFilenameForJpg(jpg, strings.ToUpper(rawExtension))
 		rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
@@ -27,6 +27,12 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension s
 		}
 	}
 	return jpgsToDelete
+}
+
+// GetRelativeDir returns the directory of fullPath relative to baseDir
+// E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "/some/dir"
+func GetRelativeDir(fullPath, baseDir string) string {
+	return strings.TrimPrefix(filepath.Dir(fullPath), baseDir)
 }
 
 // _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg

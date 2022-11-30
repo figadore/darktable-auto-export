@@ -24,6 +24,27 @@ func TestFindXmps(t *testing.T) {
 	}
 }
 
+func TestGetRelativeDir(t *testing.T) {
+	var tests = []struct {
+		fullPath string
+		baseDir  string
+		want     string
+	}{
+		{"./the/path/filename.txt", "./", "the/path"},
+		{"/mnt/path/filename.txt", "/mnt", "/path"},
+	}
+
+	for _, tt := range tests {
+		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.baseDir)
+		t.Run(testname, func(t *testing.T) {
+			relativeDir := GetRelativeDir(tt.fullPath, tt.baseDir)
+			if relativeDir != tt.want {
+				t.Errorf("got %s, want %s", relativeDir, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetJpgFilename(t *testing.T) {
 	var tests = []struct {
 		rawPath string

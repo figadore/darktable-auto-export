@@ -123,7 +123,7 @@ func syncRaw(raw string) {
 	// Find adjacent xmp files
 	xmps := sidecars.FindXmps(raw)
 	basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-	relativeDir := strings.TrimPrefix(filepath.Dir(raw), syncOpts.inputPath)
+	relativeDir := sidecars.GetRelativeDir(raw, syncOpts.inputPath)
 	outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
 	params := darktable.ExportParams{
 		Command:    syncOpts.command,
@@ -150,7 +150,7 @@ func syncFile(path string) error {
 		fmt.Println("Syncing xmp")
 		raw := sidecars.GetRawPathForXmp(xmp, syncOpts.extension)
 		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-		relativeDir := filepath.Dir(strings.TrimPrefix(syncOpts.inputPath, filepath.Dir(raw)))
+		relativeDir := sidecars.GetRelativeDir(raw, syncOpts.inputPath)
 		outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
 		params := darktable.ExportParams{
 			Command:    syncOpts.command,
@@ -166,6 +166,7 @@ func syncFile(path string) error {
 		}
 		params.OutputPath = outputPath
 		darktable.Export(params)
+	// raw
 	case strings.EqualFold(ext, syncOpts.extension):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
 		syncRaw(path)
