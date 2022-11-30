@@ -75,6 +75,11 @@ func FindFilesWithExt(folder, extension string) []string {
 		if e != nil {
 			return e
 		}
+		// #recycle is for synology
+		// FIXME make ignore paths configurable
+		if strings.Contains(path, "#recycle") {
+			return nil
+		}
 		if strings.EqualFold(filepath.Ext(path), extension) {
 			raws = append(raws, path)
 		}
