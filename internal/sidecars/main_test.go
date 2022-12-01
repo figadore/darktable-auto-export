@@ -111,6 +111,7 @@ func TestGetRawPathForXmp(t *testing.T) {
 
 		// /some/dir/_DSC1234_01.xmp -> /some/dir/_DSC1234.ARW
 		// /some/dir/_DSC1234_01.ARW.xmp -> /some/dir/_DSC1234.ARW
+		{"/some/dir/_DSC1234_01.arw.xmp", "/some/dir/_DSC1234.ARW"},
 		{"/some/dir/_DSC1234_01.xmp", "/some/dir/_DSC1234.ARW"},
 		{"/some/dir/_DSC1234_01.ARW.xmp", "/some/dir/_DSC1234.ARW"},
 	}

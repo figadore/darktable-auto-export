@@ -64,7 +64,7 @@ func GetRawPathForXmp(xmpPath string, extension string) string {
 	basename := strings.TrimSuffix(xmpPath, filepath.Ext(xmpPath))
 	// Remove sidecar duplicates suffix (e.g. _01) if it exists
 	// Also strip out the raw extension if it exists
-	exp := regexp.MustCompile(fmt.Sprintf(`(.*?)(?:_\d{2})?(?:%s)?`, extension))
+	exp := regexp.MustCompile(fmt.Sprintf(`(.*?)(?i)(?:_\d{2})?(?:%s)?`, extension))
 	xmpBasename := exp.ReplaceAllString(basename, "${1}")
 	return fmt.Sprintf("%s%s", xmpBasename, extension)
 }
