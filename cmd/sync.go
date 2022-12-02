@@ -142,7 +142,10 @@ func syncRaw(raw string) error {
 	} else {
 		for _, xmp := range xmps {
 			fmt.Println("Sync xmp file", xmp)
-			syncFile(xmp)
+			err := syncFile(xmp)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
