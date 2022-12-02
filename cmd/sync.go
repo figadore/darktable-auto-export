@@ -175,7 +175,10 @@ func syncFile(path string) error {
 			log.Fatalf("Error getting jpg path: %v", err)
 		}
 		params.OutputPath = outputPath
-		darktable.Export(params)
+		err = darktable.Export(params)
+		if err != nil {
+			return err
+		}
 	// raw
 	case strings.EqualFold(ext, syncOpts.extension):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
