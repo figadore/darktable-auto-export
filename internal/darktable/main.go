@@ -16,7 +16,7 @@ type ExportParams struct {
 	OutputPath string
 }
 
-func Export(params ExportParams) {
+func Export(params ExportParams) error {
 	err := sidecars.DeleteJpgIfExists(params.OutputPath)
 	if err != nil {
 		log.Fatalf("Error deleting jpg: %v", err)
@@ -39,5 +39,7 @@ func Export(params ExportParams) {
 	if err != nil {
 		fmt.Println("error", err.Error())
 		fmt.Println("err", err)
+		return err
 	}
+	return nil
 }
