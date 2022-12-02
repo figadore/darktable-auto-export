@@ -81,7 +81,7 @@ func sync(cmd *cobra.Command, args []string) error {
 	// This returns an *os.FileInfo type
 	fileInfo, err := file.Stat()
 	if err != nil {
-		// error handling
+		return err
 	}
 
 	// IsDir is short for fileInfo.Mode().IsDir()
@@ -99,7 +99,10 @@ func syncDir() error {
 	raws := sidecars.FindFilesWithExt(syncOpts.inputPath, syncOpts.extension)
 	config := parseConfig()
 	for _, raw := range raws {
-		syncRaw(raw)
+		err := syncRaw(raw)
+		if err != nil {
+			return err
+		}
 	}
 	// Delete jpgs for missing raws
 	if config.DeleteMissing == "true" {
@@ -118,7 +121,7 @@ func syncDir() error {
 	return nil
 }
 
-func syncRaw(raw string) {
+func syncRaw(raw string) error {
 	fmt.Println("Syncing raw", raw)
 	// Find adjacent xmp files
 	xmps := sidecars.FindXmps(raw)
@@ -132,13 +135,20 @@ func syncRaw(raw string) {
 	}
 	if len(xmps) == 0 {
 		fmt.Println("No xmp files found, applying default settings")
-		darktable.Export(params)
+		err := darktable.Export(params)
+		if err != nil {
+			return err
+		}
 	} else {
 		for _, xmp := range xmps {
 			fmt.Println("Sync xmp file", xmp)
-			syncFile(xmp)
+			err := syncFile(xmp)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // syncFile takes the path to a raw file or xmp and exports jpgs
@@ -169,7 +179,10 @@ func syncFile(path string) error {
 	// raw
 	case strings.EqualFold(ext, syncOpts.extension):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
-		syncRaw(path)
+		err := syncRaw(path)
+		if err != nil {
+			return err
+		}
 	default:
 		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, syncOpts.extension))
 	}
