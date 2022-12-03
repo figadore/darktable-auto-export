@@ -22,10 +22,12 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension s
 		// Check for the uppercase and lowercase version of the raw extension
 		if _, err := os.Stat(rawPathLower); errors.Is(err, os.ErrNotExist) {
 			if _, e := os.Stat(rawPathUpper); errors.Is(e, os.ErrNotExist) {
+				fmt.Printf("No raw found for %s at %s or %s", jpg, rawPathLower, rawPathUpper)
 				jpgsToDelete = append(jpgsToDelete, jpg)
 			}
 		}
 	}
+	fmt.Printf("Found %v jpgs to delete", len(jpgsToDelete))
 	return jpgsToDelete
 }
 

@@ -102,7 +102,6 @@ func syncDir() error {
 		fmt.Println("Deleting jpgs for missing raws")
 		jpgs := sidecars.FindFilesWithExt(syncOpts.outputFolder, ".jpg")
 		deleteJpgs(sidecars.FindJpgsWithoutRaw(jpgs, syncOpts.inputPath, syncOpts.outputFolder, syncOpts.extension))
-		fmt.Printf("Found %v jpgs", len(jpgs))
 	} else {
 		fmt.Printf("Not deleting jpgs for missing raws: %s", config.DeleteMissing)
 	}
@@ -194,5 +193,6 @@ func deleteJpgs(jpgs []string) {
 			log.Fatalf("Error deleting jpg: %v", err)
 			return
 		}
+		fmt.Printf("Deleted jpg: %v", err)
 	}
 }
