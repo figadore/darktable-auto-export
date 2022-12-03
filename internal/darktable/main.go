@@ -48,7 +48,7 @@ func Export(params ExportParams) error {
 	cmd := exec.Command(args[0], remaining...)
 	//cmd := exec.Command("echo", args...)
 	stdout, err := cmd.CombinedOutput()
-	fmt.Println("stdout/stderr:", string(stdout), ":end stdout/stderr;")
+	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===")
 	fmt.Println()
 	if err != nil {
 		fmt.Println("error", err.Error())
