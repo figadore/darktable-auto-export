@@ -50,6 +50,7 @@ func TestGetJpgFilename(t *testing.T) {
 		rawPath string
 		want    string
 	}{
+		{"/tests/src/_DSC1234.ARW.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234.ARW.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234.arw.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234_01.arw.xmp", "_DSC1234_01.jpg"},
