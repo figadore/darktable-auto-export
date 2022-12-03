@@ -1,8 +1,10 @@
 package darktable
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -14,9 +16,20 @@ type ExportParams struct {
 	RawPath    string
 	XmpPath    string
 	OutputPath string
+	OnlyNew    bool
 }
 
 func Export(params ExportParams) error {
+	if params.OnlyNew {
+		if _, e := os.Stat(params.OutputPath); e == nil {
+			fmt.Printf("jpg found at %s, skipping export\n", params.OutputPath)
+			return nil
+		} else if errors.Is(e, os.ErrNotExist) {
+			//continue as usual
+		} else {
+			return e
+		}
+	}
 	err := sidecars.DeleteJpgIfExists(params.OutputPath)
 	if err != nil {
 		log.Fatalf("Error deleting jpg: %v", err)
@@ -35,7 +48,8 @@ func Export(params ExportParams) error {
 	cmd := exec.Command(args[0], remaining...)
 	//cmd := exec.Command("echo", args...)
 	stdout, err := cmd.CombinedOutput()
-	fmt.Println("stdout", string(stdout))
+	fmt.Println("stdout/stderr:", string(stdout), ":end stdout/stderr;")
+	fmt.Println()
 	if err != nil {
 		fmt.Println("error", err.Error())
 		fmt.Println("err", err)

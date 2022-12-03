@@ -42,6 +42,7 @@ func init() {
 	syncCmd.Flags().StringVarP(&syncOpts.outputFolder, "out", "o", "./", "Directory to export jpgs to")
 	syncCmd.Flags().StringVarP(&syncOpts.command, "command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
 	syncCmd.Flags().StringVarP(&syncOpts.extension, "extension", "e", ".ARW", "Extension of raw files")
+	syncCmd.Flags().BoolVarP(&syncOpts.onlyNew, "new", "n", false, "Only export when target jpg does not exist")
 }
 
 type syncOptions struct {
@@ -49,6 +50,7 @@ type syncOptions struct {
 	outputFolder string
 	extension    string
 	command      string
+	onlyNew      bool
 }
 
 type Config struct {
@@ -132,6 +134,7 @@ func syncRaw(raw string) error {
 		Command:    syncOpts.command,
 		RawPath:    raw,
 		OutputPath: outputPath,
+		OnlyNew:    syncOpts.onlyNew,
 	}
 	if len(xmps) == 0 {
 		fmt.Println("No xmp files found, applying default settings")
@@ -166,6 +169,7 @@ func syncFile(path string) error {
 			Command:    syncOpts.command,
 			RawPath:    raw,
 			OutputPath: outputPath,
+			OnlyNew:    syncOpts.onlyNew,
 		}
 		// Export the RAW file
 		params.XmpPath = xmp
