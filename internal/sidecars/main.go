@@ -29,10 +29,45 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder, rawExtension s
 	return jpgsToDelete
 }
 
+func IsDir(path string) (bool, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	// This returns an *os.FileInfo type
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return false, err
+	}
+
+	// IsDir is short for fileInfo.Mode().IsDir()
+	if fileInfo.IsDir() {
+		return true, nil
+	} else {
+		// not a directory
+		return false, nil
+	}
+}
+
 // GetRelativeDir returns the directory of fullPath relative to baseDir
 // E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "/some/dir"
-func GetRelativeDir(fullPath, baseDir string) string {
-	return strings.TrimPrefix(filepath.Dir(fullPath), baseDir)
+func GetRelativeDir(fullPath, inputPath string) string {
+	var baseDir string
+	isDir, err := IsDir(inputPath)
+	if err != nil {
+		log.Fatalf("Error getting relative dir for input path '%s': %v", inputPath, err)
+	}
+
+	if isDir {
+		baseDir = inputPath
+	} else {
+		baseDir = filepath.Dir(inputPath)
+	}
+
+	relativeDir := strings.TrimPrefix(filepath.Dir(fullPath), baseDir)
+	// debug
+	fmt.Println("Relative dir of", fullPath, "given", baseDir, "is", relativeDir)
+	return relativeDir
 }
 
 // _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg

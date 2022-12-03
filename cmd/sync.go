@@ -73,24 +73,15 @@ func parseConfig() Config {
 }
 
 func sync(cmd *cobra.Command, args []string) error {
-	// Check whether input arg is a directory or an xmp file
-	file, err := os.Open(syncOpts.inputPath)
+	// Check whether input arg is a directory or a xmp file
+	isDir, err := sidecars.IsDir(syncOpts.inputPath)
 	if err != nil {
 		return err
 	}
 
-	defer file.Close()
-	// This returns an *os.FileInfo type
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return err
-	}
-
-	// IsDir is short for fileInfo.Mode().IsDir()
-	if fileInfo.IsDir() {
+	if isDir {
 		return syncDir()
 	} else {
-		// not a directory
 		return syncFile(syncOpts.inputPath)
 	}
 
