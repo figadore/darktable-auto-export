@@ -62,16 +62,17 @@ func Export(params ExportParams) error {
 	if err != nil {
 		return err
 	}
+	err = os.Chtimes(tmpPath, t, t)
 
 	// Move tmp file to target OutputPath. This is what allows an album to stay intact
 	err = os.Rename(tmpPath, params.OutputPath)
 	if err != nil {
 		return err
 	}
-	err = os.Chtimes(params.OutputPath, t, t)
-	if err != nil {
-		return err
-	}
+	//err = os.Chtimes(params.OutputPath, t, t)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 
