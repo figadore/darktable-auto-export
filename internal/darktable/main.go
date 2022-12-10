@@ -56,7 +56,8 @@ func Export(params ExportParams) error {
 		return err
 	}
 	// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
-	t, err := GetModifiedDate(params.OutputPath, tmpPath)
+	t, err := GetModifiedDate(params.OutputPath)
+	fmt.Println("Modified date:", t)
 	if err != nil {
 		return err
 	}
@@ -73,13 +74,14 @@ func Export(params ExportParams) error {
 	return nil
 }
 
-func GetModifiedDate(src, dst string) (time.Time, error) {
+func GetModifiedDate(src string) (time.Time, error) {
 	if info, err := os.Stat(src); err == nil {
 		fmt.Printf("Found existing file at target path. copying modified date %s\n", src)
 		t := info.ModTime()
 		return t, nil
 	} else if errors.Is(err, os.ErrNotExist) {
 		// file doesn't exist, nothing to delete
+		fmt.Printf("Did not find existing file at target path. Can't copy modified date %s\n", src)
 		return time.Now(), nil
 	} else {
 		return time.Now(), err
