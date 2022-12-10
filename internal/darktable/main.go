@@ -41,38 +41,47 @@ func Export(params ExportParams) error {
 	//args = append(args, params.OutputPath)
 	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
 	args = append(args, tmpPath)
+	err := runCmd(args)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Completed export to tmp file?", tmpPath)
+	args = []string{"touch", "-r", params.OutputPath, tmpPath}
+	runCmd(args)
+	args = []string{"cp", "-p", tmpPath, params.OutputPath}
+	runCmd(args)
+	//// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
+	//t, err := GetModifiedDate(params.OutputPath)
+	//fmt.Println("Modified date:", t)
+	//if err != nil {
+	//	return err
+	//}
+	//err = os.Chtimes(tmpPath, t, t)
+
+	//// Move tmp file to target OutputPath. This is what allows an album to stay intact
+	//err = os.Rename(tmpPath, params.OutputPath)
+	//if err != nil {
+	//	return err
+	//}
+	////err = os.Chtimes(params.OutputPath, t, t)
+	////if err != nil {
+	////	return err
+	////}
+	return nil
+}
+
+func runCmd(args []string) error {
 	remaining := args[1:]
-	//cmd := exec.Command("echo", remaining...)
 	fmt.Println(args)
-	fmt.Println(len(args))
 	cmd := exec.Command(args[0], remaining...)
-	//cmd := exec.Command("echo", args...)
 	stdout, err := cmd.CombinedOutput()
 	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
-	fmt.Println("Completed export to tmp file?", tmpPath)
 	if err != nil {
 		fmt.Println("error", err.Error())
 		fmt.Println("err", err)
 		return err
 	}
 	fmt.Println("No err from cmd")
-	// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
-	t, err := GetModifiedDate(params.OutputPath)
-	fmt.Println("Modified date:", t)
-	if err != nil {
-		return err
-	}
-	err = os.Chtimes(tmpPath, t, t)
-
-	// Move tmp file to target OutputPath. This is what allows an album to stay intact
-	err = os.Rename(tmpPath, params.OutputPath)
-	if err != nil {
-		return err
-	}
-	//err = os.Chtimes(params.OutputPath, t, t)
-	//if err != nil {
-	//	return err
-	//}
 	return nil
 }
 
