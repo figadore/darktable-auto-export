@@ -48,8 +48,10 @@ func Export(params ExportParams) error {
 	fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath}
 	runCmd(args)
-	//args = []string{"cp", "-p", tmpPath, params.OutputPath}
-	args = []string{"mv", tmpPath, params.OutputPath}
+	args = []string{"cp", "-p", tmpPath, params.OutputPath}
+	//args = []string{"mv", tmpPath, params.OutputPath}
+	runCmd(args)
+	args = []string{"rm", tmpPath}
 	runCmd(args)
 	//// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
 	//t, err := GetModifiedDate(params.OutputPath)
