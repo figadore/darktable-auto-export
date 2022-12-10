@@ -48,13 +48,14 @@ func Export(params ExportParams) error {
 	cmd := exec.Command(args[0], remaining...)
 	//cmd := exec.Command("echo", args...)
 	stdout, err := cmd.CombinedOutput()
-	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===")
-	fmt.Println()
+	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+	fmt.Println("Completed export to tmp file?", tmpPath)
 	if err != nil {
 		fmt.Println("error", err.Error())
 		fmt.Println("err", err)
 		return err
 	}
+	fmt.Println("No err from cmd")
 	// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
 	t, err := GetModifiedDate(params.OutputPath)
 	fmt.Println("Modified date:", t)
