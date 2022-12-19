@@ -28,11 +28,6 @@ func Export(params ExportParams) error {
 			return e
 		}
 	}
-	//err := sidecars.DeleteJpgIfExists(params.OutputPath)
-	//if err != nil {
-	//	log.Fatalf("Error deleting jpg: %v", err)
-	//}
-	//cmd := exec.Command("echo", params.rawPath, ":", params.xmpPath, "->", params.OutputPath)
 	args := strings.Fields(params.Command)
 	args = append(args, params.RawPath)
 	if params.XmpPath != "" {
@@ -41,6 +36,8 @@ func Export(params ExportParams) error {
 	//args = append(args, params.OutputPath)
 	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
 	args = append(args, tmpPath)
+	// Uncomment this line to do a dry run (maybe turn this into a param, but be sure to include dry run deleting files)
+	//args = append([]string{"echo"}, args...)
 	err := runCmd(args)
 	if err != nil {
 		return err
@@ -48,8 +45,8 @@ func Export(params ExportParams) error {
 	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
 	// Synology albums lost track of replaced images whenever I used a method
 	// other than these commands
-	fmt.Println("Completed export to tmp file?", tmpPath)
-	args = []string{"touch", "-r", params.OutputPath, tmpPath}
+	//fmt.Println("Completed export to tmp file?", tmpPath)
+	args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
 	runCmd(args)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
 	runCmd(args)
