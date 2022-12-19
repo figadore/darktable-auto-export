@@ -12,7 +12,7 @@ import (
 	"github.com/figadore/darktable-auto-export/internal/sidecars"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/viper"
 )
 
 var syncCmd = &cobra.Command{
@@ -26,8 +26,6 @@ Given a xmp file, a single jpg will be produced for the matching raw`,
 	RunE: sync,
 }
 
-var syncOpts syncOptions
-
 func init() {
 	rootCmd.AddCommand(syncCmd)
 
@@ -38,43 +36,32 @@ func init() {
 	// syncCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Local flags which will only run when this command is called directly
-	syncCmd.Flags().StringVarP(&syncOpts.inputPath, "in", "i", "./", "Directory or file of raw image(s)")
-	syncCmd.Flags().StringVarP(&syncOpts.outputFolder, "out", "o", "./", "Directory to export jpgs to")
-	syncCmd.Flags().StringVarP(&syncOpts.command, "command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
-	syncCmd.Flags().StringVarP(&syncOpts.extension, "extension", "e", ".ARW", "Extension of raw files")
-	syncCmd.Flags().BoolVarP(&syncOpts.onlyNew, "new", "n", false, "Only export when target jpg does not exist")
-}
+	syncCmd.Flags().StringP("in", "i", "./", "Directory or file of raw image(s)")
+	syncCmd.Flags().StringP("out", "o", "./", "Directory to export jpgs to")
+	syncCmd.Flags().StringP("command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
+	syncCmd.Flags().StringP("extension", "e", ".ARW", "Extension of raw files")
+	syncCmd.Flags().BoolP("new", "n", false, "Only export when target jpg does not exist")
+	syncCmd.Flags().BoolP("delete-missing", "d", false, `Delete jpgs where corresponding raw files are missing. This is useful for darktable workflows where editing and culling can be done at any time, not just up front. *warning* This will delete all jpgs in the output directory where a corresponding raw file with the specified extension cannot be found! Only use this for directories that are exclusively for this workflow, and where the source files stay where they are/were.
+`)
 
-type syncOptions struct {
-	inputPath    string
-	outputFolder string
-	extension    string
-	command      string
-	onlyNew      bool
-}
-
-type Config struct {
-	DeleteMissing string `yaml:"delete-missing"`
-}
-
-func parseConfig() Config {
-	config := Config{}
-	ymlContents, err := os.ReadFile("config.yml")
-	fmt.Println("yaml contents: ", string(ymlContents))
+	viper.SetConfigName("config")
+	// Is viper.SetConfigType() needed here?
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("$HOME/.darktable-auto-export")
+	err := viper.ReadInConfig()
 	if err != nil {
-		log.Fatalf("Error reading config file: %v", err)
+		// Only allow config file not found error
+		// Not sure why viper.ConfigFileNotFoundError doesn't work with errors.Is() or errors.As()
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			panic(fmt.Errorf("Fatal error reading config file: %w", err))
+		}
 	}
-	err = yaml.Unmarshal(ymlContents, &config)
-	fmt.Println("config: ", config)
-	if err != nil {
-		log.Fatalf("yaml read error: %v", err)
-	}
-	return config
+	viper.BindPFlags(syncCmd.Flags())
 }
 
 func sync(cmd *cobra.Command, args []string) error {
 	// Check whether input arg is a directory or a xmp file
-	isDir, err := sidecars.IsDir(syncOpts.inputPath)
+	isDir, err := sidecars.IsDir(viper.GetString("in"))
 	if err != nil {
 		return err
 	}
@@ -82,15 +69,14 @@ func sync(cmd *cobra.Command, args []string) error {
 	if isDir {
 		return syncDir()
 	} else {
-		return syncFile(syncOpts.inputPath)
+		return syncFile(viper.GetString("in"))
 	}
 
 }
 
 func syncDir() error {
 	// Recurse through input directory looking for finding raw files
-	raws := sidecars.FindFilesWithExt(syncOpts.inputPath, syncOpts.extension)
-	config := parseConfig()
+	raws := sidecars.FindFilesWithExt(viper.GetString("in"), viper.GetString("extension"))
 	for _, raw := range raws {
 		err := syncRaw(raw)
 		if err != nil {
@@ -98,14 +84,14 @@ func syncDir() error {
 		}
 	}
 	// Delete jpgs for missing raws
-	if config.DeleteMissing == "true" {
+	if viper.GetBool("delete-missing") {
 		fmt.Println("Deleting jpgs for missing raws")
-		jpgs := sidecars.FindFilesWithExt(syncOpts.outputFolder, ".jpg")
-		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, syncOpts.inputPath, syncOpts.outputFolder, syncOpts.extension)
+		jpgs := sidecars.FindFilesWithExt(viper.GetString("out"), ".jpg")
+		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetString("extension"))
 		deleteJpgs(jpgsToDelete)
 		fmt.Printf("Deleting %v of %v jpgs", len(jpgsToDelete), len(jpgs))
 	} else {
-		fmt.Printf("Not deleting jpgs for missing raws: %s", config.DeleteMissing)
+		fmt.Printf("Not deleting jpgs for missing raws")
 	}
 	// Look for xmp file(s) for the raw file
 	// If no xmp file exists for a RAW...
@@ -120,13 +106,13 @@ func syncRaw(raw string) error {
 	// Find adjacent xmp files
 	xmps := sidecars.FindXmps(raw)
 	basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-	relativeDir := sidecars.GetRelativeDir(raw, syncOpts.inputPath)
-	outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
+	relativeDir := sidecars.GetRelativeDir(raw, viper.GetString("in"))
+	outputPath := filepath.Join(viper.GetString("out"), relativeDir, fmt.Sprintf("%s.jpg", basename))
 	params := darktable.ExportParams{
-		Command:    syncOpts.command,
+		Command:    viper.GetString("command"),
 		RawPath:    raw,
 		OutputPath: outputPath,
-		OnlyNew:    syncOpts.onlyNew,
+		OnlyNew:    viper.GetBool("new"),
 	}
 	if len(xmps) == 0 {
 		fmt.Println("No xmp files found, applying default settings")
@@ -148,25 +134,25 @@ func syncRaw(raw string) error {
 
 // syncFile takes the path to a raw file or xmp and exports jpgs
 func syncFile(path string) error {
-	//switch ext := filepath.Ext(syncOpts.inputPath); {
+	//switch ext := filepath.Ext(viper.GetString("in")); {
 	switch ext := filepath.Ext(path); {
 	case ext == ".xmp":
 		xmp := path
 		fmt.Println("Syncing xmp")
-		raw := sidecars.GetRawPathForXmp(xmp, syncOpts.extension)
+		raw := sidecars.GetRawPathForXmp(xmp, viper.GetString("extension"))
 		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-		relativeDir := sidecars.GetRelativeDir(raw, syncOpts.inputPath)
-		outputPath := filepath.Join(syncOpts.outputFolder, relativeDir, fmt.Sprintf("%s.jpg", basename))
+		relativeDir := sidecars.GetRelativeDir(raw, viper.GetString("in"))
+		outputPath := filepath.Join(viper.GetString("out"), relativeDir, fmt.Sprintf("%s.jpg", basename))
 		params := darktable.ExportParams{
-			Command:    syncOpts.command,
+			Command:    viper.GetString("command"),
 			RawPath:    raw,
 			OutputPath: outputPath,
-			OnlyNew:    syncOpts.onlyNew,
+			OnlyNew:    viper.GetBool("new"),
 		}
 		// Export the RAW file
 		params.XmpPath = xmp
-		jpgFilename := sidecars.GetJpgFilename(xmp, syncOpts.extension)
-		outputPath, err := filepath.Abs(filepath.Join(syncOpts.outputFolder, relativeDir, jpgFilename))
+		jpgFilename := sidecars.GetJpgFilename(xmp, viper.GetString("extension"))
+		outputPath, err := filepath.Abs(filepath.Join(viper.GetString("out"), relativeDir, jpgFilename))
 		if err != nil {
 			log.Fatalf("Error getting jpg path: %v", err)
 		}
@@ -176,14 +162,14 @@ func syncFile(path string) error {
 			return err
 		}
 	// raw
-	case strings.EqualFold(ext, syncOpts.extension):
+	case strings.EqualFold(ext, viper.GetString("extension")):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
 		err := syncRaw(path)
 		if err != nil {
 			return err
 		}
 	default:
-		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, syncOpts.extension))
+		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, viper.GetString("extension")))
 	}
 	return nil
 }

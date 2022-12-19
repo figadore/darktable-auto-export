@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // unlockCmd represents the unlock command
@@ -30,20 +31,27 @@ func init() {
 		log.Fatalf("Unable to read home directory")
 	}
 	defaultConfigDir := filepath.Join(home, ".var/app/org.darktable.Darktable/config/darktable/")
-	unlockCmd.Flags().StringVarP(&unlockOpts.lockDir, "lockdir", "", defaultConfigDir, "Directory where darktable lock files are kept. Often ~/.config/darktable for local installations")
-}
+	unlockCmd.Flags().StringP("lockdir", "", defaultConfigDir, "Directory where darktable lock files are kept. Often ~/.config/darktable for local installations")
 
-var unlockOpts unlockOptions
-
-type unlockOptions struct {
-	lockDir string
+	viper.SetConfigName("config")
+	// Is viper.SetConfigType() needed here?
+	viper.AddConfigPath(".")
+	err = viper.ReadInConfig()
+	if err != nil {
+		// Only allow config file not found error
+		// Not sure why viper.ConfigFileNotFoundError doesn't work with errors.Is() or errors.As()
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			panic(fmt.Errorf("Fatal error reading config file: %w", err))
+		}
+	}
+	viper.BindPFlags(unlockCmd.Flags())
 }
 
 func Unlock(cmd *cobra.Command, args []string) error {
 	fmt.Println("Deleting lock files")
 
-	dbLockPath := filepath.Join(unlockOpts.lockDir, "data.db.lock")
-	libraryLockPath := filepath.Join(unlockOpts.lockDir, "library.db.lock")
+	dbLockPath := filepath.Join(viper.GetString("lockdir"), "data.db.lock")
+	libraryLockPath := filepath.Join(viper.GetString("lockdir"), "library.db.lock")
 	err := deleteFile(dbLockPath)
 	if err != nil {
 		return err
