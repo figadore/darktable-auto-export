@@ -45,31 +45,16 @@ func Export(params ExportParams) error {
 	if err != nil {
 		return err
 	}
+	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
+	// Synology albums lost track of replaced images whenever I used a method
+	// other than these commands
 	fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath}
 	runCmd(args)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
-	//args = []string{"mv", tmpPath, params.OutputPath}
 	runCmd(args)
 	args = []string{"rm", tmpPath}
 	runCmd(args)
-	//// Update the modified time to match the existing jpg if it exists. This is what allows an album to stay intact
-	//t, err := GetModifiedDate(params.OutputPath)
-	//fmt.Println("Modified date:", t)
-	//if err != nil {
-	//	return err
-	//}
-	//err = os.Chtimes(tmpPath, t, t)
-
-	//// Move tmp file to target OutputPath. This is what allows an album to stay intact
-	//err = os.Rename(tmpPath, params.OutputPath)
-	//if err != nil {
-	//	return err
-	//}
-	////err = os.Chtimes(params.OutputPath, t, t)
-	////if err != nil {
-	////	return err
-	////}
 	return nil
 }
 
@@ -78,13 +63,14 @@ func runCmd(args []string) error {
 	fmt.Println(args)
 	cmd := exec.Command(args[0], remaining...)
 	stdout, err := cmd.CombinedOutput()
-	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+	if len(stdout) != 0 {
+		fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+	}
 	if err != nil {
-		fmt.Println("error", err.Error())
-		fmt.Println("err", err)
+		fmt.Println("cmd error", err.Error())
+		fmt.Println("cmd err", err)
 		return err
 	}
-	fmt.Println("No err from cmd")
 	return nil
 }
 
