@@ -34,6 +34,7 @@ func IsDir(path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer file.Close()
 	// This returns an *os.FileInfo type
 	fileInfo, err := file.Stat()
 	if err != nil {

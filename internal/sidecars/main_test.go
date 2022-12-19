@@ -26,18 +26,19 @@ func TestFindXmps(t *testing.T) {
 
 func TestGetRelativeDir(t *testing.T) {
 	var tests = []struct {
-		fullPath string
-		baseDir  string
-		want     string
+		fullPath  string
+		inputPath string
+		want      string
 	}{
+		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW.xmp", ""},
 		{"./the/path/filename.txt", "./", "the/path"},
 		{"/mnt/path/filename.txt", "/mnt", "/path"},
 	}
 
 	for _, tt := range tests {
-		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.baseDir)
+		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.inputPath)
 		t.Run(testname, func(t *testing.T) {
-			relativeDir := GetRelativeDir(tt.fullPath, tt.baseDir)
+			relativeDir := GetRelativeDir(tt.fullPath, tt.inputPath)
 			if relativeDir != tt.want {
 				t.Errorf("got %s, want %s", relativeDir, tt.want)
 			}
