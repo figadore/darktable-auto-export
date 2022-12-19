@@ -3,12 +3,10 @@ package darktable
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/figadore/darktable-auto-export/internal/sidecars"
+	"time"
 )
 
 type ExportParams struct {
@@ -30,30 +28,62 @@ func Export(params ExportParams) error {
 			return e
 		}
 	}
-	err := sidecars.DeleteJpgIfExists(params.OutputPath)
-	if err != nil {
-		log.Fatalf("Error deleting jpg: %v", err)
-	}
+	//err := sidecars.DeleteJpgIfExists(params.OutputPath)
+	//if err != nil {
+	//	log.Fatalf("Error deleting jpg: %v", err)
+	//}
 	//cmd := exec.Command("echo", params.rawPath, ":", params.xmpPath, "->", params.OutputPath)
 	args := strings.Fields(params.Command)
 	args = append(args, params.RawPath)
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
 	}
-	args = append(args, params.OutputPath)
-	remaining := args[1:]
-	//cmd := exec.Command("echo", remaining...)
-	fmt.Println(args)
-	fmt.Println(len(args))
-	cmd := exec.Command(args[0], remaining...)
-	//cmd := exec.Command("echo", args...)
-	stdout, err := cmd.CombinedOutput()
-	fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===")
-	fmt.Println()
+	//args = append(args, params.OutputPath)
+	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
+	args = append(args, tmpPath)
+	err := runCmd(args)
 	if err != nil {
-		fmt.Println("error", err.Error())
-		fmt.Println("err", err)
+		return err
+	}
+	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
+	// Synology albums lost track of replaced images whenever I used a method
+	// other than these commands
+	fmt.Println("Completed export to tmp file?", tmpPath)
+	args = []string{"touch", "-r", params.OutputPath, tmpPath}
+	runCmd(args)
+	args = []string{"cp", "-p", tmpPath, params.OutputPath}
+	runCmd(args)
+	args = []string{"rm", tmpPath}
+	runCmd(args)
+	return nil
+}
+
+func runCmd(args []string) error {
+	remaining := args[1:]
+	fmt.Println(args)
+	cmd := exec.Command(args[0], remaining...)
+	stdout, err := cmd.CombinedOutput()
+	if len(stdout) != 0 {
+		fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+	}
+	if err != nil {
+		fmt.Println("cmd error", err.Error())
+		fmt.Println("cmd err", err)
 		return err
 	}
 	return nil
+}
+
+func GetModifiedDate(src string) (time.Time, error) {
+	if info, err := os.Stat(src); err == nil {
+		fmt.Printf("Found existing file at target path. copying modified date %s\n", src)
+		t := info.ModTime()
+		return t, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		// file doesn't exist, nothing to delete
+		fmt.Printf("Did not find existing file at target path. Can't copy modified date %s\n", src)
+		return time.Now(), nil
+	} else {
+		return time.Now(), err
+	}
 }
