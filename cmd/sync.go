@@ -39,7 +39,7 @@ func init() {
 	syncCmd.Flags().StringP("in", "i", "./", "Directory or file of raw image(s)")
 	syncCmd.Flags().StringP("out", "o", "./", "Directory to export jpgs to")
 	syncCmd.Flags().StringP("command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
-	syncCmd.Flags().StringP("extension", "e", ".ARW", "Extension of raw files")
+	syncCmd.Flags().StringSliceP("extension", "e", []string{".ARW"}, "Extension of raw files")
 	syncCmd.Flags().BoolP("new", "n", false, "Only export when target jpg does not exist")
 	syncCmd.Flags().BoolP("delete-missing", "d", false, `Delete jpgs where corresponding raw files are missing. This is useful for darktable workflows where editing and culling can be done at any time, not just up front. *warning* This will delete all jpgs in the output directory where a corresponding raw file with the specified extension cannot be found! Only use this for directories that are exclusively for this workflow, and where the source files stay where they are/were.
 `)
@@ -76,7 +76,11 @@ func sync(cmd *cobra.Command, args []string) error {
 
 func syncDir() error {
 	// Recurse through input directory looking for finding raw files
-	raws := sidecars.FindFilesWithExt(viper.GetString("in"), viper.GetString("extension"))
+	var raws []string
+	// For each defined extension, add to the list of raws
+	for _, ext := range viper.GetStringSlice("extension") {
+		raws = append(raws, sidecars.FindFilesWithExt(viper.GetString("in"), ext)...)
+	}
 	for _, raw := range raws {
 		err := syncRaw(raw)
 		if err != nil {
@@ -87,7 +91,7 @@ func syncDir() error {
 	if viper.GetBool("delete-missing") {
 		fmt.Println("Deleting jpgs for missing raws")
 		jpgs := sidecars.FindFilesWithExt(viper.GetString("out"), ".jpg")
-		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetString("extension"))
+		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))
 		deleteJpgs(jpgsToDelete)
 		fmt.Printf("Deleting %v of %v jpgs", len(jpgsToDelete), len(jpgs))
 	} else {
@@ -139,39 +143,48 @@ func syncFile(path string) error {
 	case ext == ".xmp":
 		xmp := path
 		fmt.Println("Syncing xmp")
-		raw := sidecars.GetRawPathForXmp(xmp, viper.GetString("extension"))
-		basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-		relativeDir := sidecars.GetRelativeDir(raw, viper.GetString("in"))
-		outputPath := filepath.Join(viper.GetString("out"), relativeDir, fmt.Sprintf("%s.jpg", basename))
-		params := darktable.ExportParams{
-			Command:    viper.GetString("command"),
-			RawPath:    raw,
-			OutputPath: outputPath,
-			OnlyNew:    viper.GetBool("new"),
+		foundRaw, err := sidecars.FindRawPathForXmp(xmp, viper.GetStringSlice("extension"))
+		if err != nil {
+			return err
 		}
+		relativeDir := sidecars.GetRelativeDir(xmp, viper.GetString("in"))
 		// Export the RAW file
-		params.XmpPath = xmp
-		jpgFilename := sidecars.GetJpgFilename(xmp, viper.GetString("extension"))
+		jpgFilename := sidecars.GetJpgFilename(xmp, viper.GetStringSlice("extension"))
 		outputPath, err := filepath.Abs(filepath.Join(viper.GetString("out"), relativeDir, jpgFilename))
 		if err != nil {
 			log.Fatalf("Error getting jpg path: %v", err)
 		}
-		params.OutputPath = outputPath
+		params := darktable.ExportParams{
+			Command:    viper.GetString("command"),
+			RawPath:    foundRaw,
+			OnlyNew:    viper.GetBool("new"),
+			OutputPath: outputPath,
+			XmpPath:    xmp,
+		}
 		err = darktable.Export(params)
 		if err != nil {
 			return err
 		}
 	// raw
-	case strings.EqualFold(ext, viper.GetString("extension")):
+	case caseInsensitiveContains(viper.GetStringSlice("extension"), ext):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
 		err := syncRaw(path)
 		if err != nil {
 			return err
 		}
 	default:
-		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, viper.GetString("extension")))
+		return errors.New(fmt.Sprintf("Extension of file to be synced ('%s') does not match the extension specified for processing ('%s')", ext, viper.GetStringSlice("extension")))
 	}
 	return nil
+}
+
+func caseInsensitiveContains(haystack []string, needle string) bool {
+	for _, v := range haystack {
+		if strings.EqualFold(needle, v) {
+			return true
+		}
+	}
+	return false
 }
 
 func deleteJpgs(jpgs []string) {

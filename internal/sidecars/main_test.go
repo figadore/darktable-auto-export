@@ -54,14 +54,16 @@ func TestGetJpgFilename(t *testing.T) {
 		{"/tests/src/_DSC1234.ARW.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234.ARW.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234.arw.xmp", "_DSC1234.jpg"},
+		{"tests/src/_DSC1234.dng.xmp", "_DSC1234.jpg"},
 		{"tests/src/_DSC1234_01.arw.xmp", "_DSC1234_01.jpg"},
+		{"tests/src/_DSC1234_01.xmp", "_DSC1234_01.jpg"},
 		{"tests/src/_DSC1234.xmp", "_DSC1234.jpg"},
 	}
 
 	for _, tt := range tests {
 		testname := fmt.Sprintf("%s", tt.rawPath)
 		t.Run(testname, func(t *testing.T) {
-			jpgPath := GetJpgFilename(tt.rawPath, ".arw")
+			jpgPath := GetJpgFilename(tt.rawPath, []string{".DNG", ".arw"})
 			if jpgPath != tt.want {
 				t.Errorf("got %s, want %s", jpgPath, tt.want)
 			}
@@ -90,11 +92,12 @@ func TestGetRawFilenameForJpg(t *testing.T) {
 
 func TestFindJpgsWithoutRaw(t *testing.T) {
 	var tests = []struct {
-		rawExt string
+		rawExt []string
 		want   []string
 	}{
-		{".arw", []string{"test/dst/_DSC4321.jpg"}},
-		{".ARW", []string{"test/dst/_DSC4321.jpg"}},
+		{[]string{".arw"}, []string{"test/dst/_DSC4321.jpg"}},
+		{[]string{".ARW"}, []string{"test/dst/_DSC4321.jpg"}},
+		{[]string{".ARW", ".dng"}, []string{"test/dst/_DSC4321.jpg"}},
 	}
 	for _, tt := range tests {
 		jpgs := FindFilesWithExt("./test/dst", ".jpg")
@@ -111,14 +114,12 @@ func TestGetRawPathForXmp(t *testing.T) {
 		want    string
 	}{
 
-		// /some/dir/_DSC1234_01.xmp -> /some/dir/_DSC1234.ARW
-		// /some/dir/_DSC1234_01.ARW.xmp -> /some/dir/_DSC1234.ARW
 		{"/some/dir/_DSC1234_01.arw.xmp", "/some/dir/_DSC1234.ARW"},
 		{"/some/dir/_DSC1234_01.xmp", "/some/dir/_DSC1234.ARW"},
 		{"/some/dir/_DSC1234_01.ARW.xmp", "/some/dir/_DSC1234.ARW"},
 	}
 	for _, tt := range tests {
-		rawPath := GetRawPathForXmp(tt.xmpPath, ".ARW")
+		rawPath := getRawPathForXmp(tt.xmpPath, ".ARW")
 		if !reflect.DeepEqual(tt.want, rawPath) {
 			t.Errorf(`Wanted %s, got %s`, tt.want, rawPath)
 		}
