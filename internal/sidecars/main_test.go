@@ -77,6 +77,7 @@ func TestGetRawFilenameForJpg(t *testing.T) {
 		want    string
 	}{
 		{"tests/dst/_DSC1234.jpg", "_DSC1234.ARW"},
+		{"tests/dst/_DSC1234_123_01.jpg", "_DSC1234_123.ARW"},
 		{"tests/dst/_DSC1234_01.jpg", "_DSC1234.ARW"},
 	}
 	for _, tt := range tests {
@@ -85,6 +86,31 @@ func TestGetRawFilenameForJpg(t *testing.T) {
 			rawPath := GetRawFilenameForJpg(tt.jpgPath, ".ARW")
 			if rawPath != tt.want {
 				t.Errorf("got %s, want %s", rawPath, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetXmpFilenameForJpg(t *testing.T) {
+	var tests = []struct {
+		jpgPath         string
+		want            string
+		wantVirtualCopy bool
+	}{
+		{"tests/dst/_DSC1234.jpg", "_DSC1234.ARW.xmp", false},
+		{"tests/dst/_DSC1234_123_01.jpg", "_DSC1234_123_01.ARW.xmp", true},
+		{"tests/dst/_DSC1234_123.jpg", "_DSC1234_123.ARW.xmp", false},
+		{"tests/dst/_DSC1234_01.jpg", "_DSC1234_01.ARW.xmp", true},
+	}
+	for _, tt := range tests {
+		testname := fmt.Sprintf("%s", tt.jpgPath)
+		t.Run(testname, func(t *testing.T) {
+			rawPath, isVirtualCopy := GetXmpFilenameForJpg(tt.jpgPath, ".ARW")
+			if rawPath != tt.want {
+				t.Errorf("got %s, want %s", rawPath, tt.want)
+			}
+			if isVirtualCopy != tt.wantVirtualCopy {
+				t.Errorf("for virtual copy check, got %v, want %v", isVirtualCopy, tt.wantVirtualCopy)
 			}
 		})
 	}

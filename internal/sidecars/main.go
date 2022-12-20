@@ -34,6 +34,41 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder string, rawExte
 			jpgsToDelete = append(jpgsToDelete, jpg)
 		}
 	}
+	fmt.Println("Jpgs with no raw:", jpgsToDelete)
+	return jpgsToDelete
+}
+
+// FindJpgsWithoutXmp scans for jpgs that have no corresponding raw/xmp pair
+// This should only affect darktable duplicates, such as _DSC1234_01.ARw.xmp/_DSC1234_01.jpg
+func FindJpgsWithoutXmp(jpgs []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+	var jpgsToDelete []string
+	for _, jpg := range jpgs {
+		relativeDir := GetRelativeDir(jpg, outputFolder)
+		found := false
+		for _, rawExtension := range rawExtensions {
+			// Check for uppercase and lowercase variations of extension
+			rawFilenameLower, isVirtualCopy := GetXmpFilenameForJpg(jpg, strings.ToLower(rawExtension))
+			rawFilenameUpper, _ := GetXmpFilenameForJpg(jpg, strings.ToUpper(rawExtension))
+			if !isVirtualCopy {
+				// skip because this function only cares about virtual copies
+				found = true
+				break
+			}
+			rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
+			rawPathUpper := filepath.Join(inputFolder, relativeDir, rawFilenameUpper)
+			// Check for the uppercase and lowercase version of the raw extension
+			if _, err := os.Stat(rawPathLower); err == nil {
+				found = true
+			}
+			if _, err := os.Stat(rawPathUpper); err == nil {
+				found = true
+			}
+		}
+		if !found {
+			jpgsToDelete = append(jpgsToDelete, jpg)
+		}
+	}
+	fmt.Println("Jpgs with no xmp:", jpgsToDelete)
 	return jpgsToDelete
 }
 
@@ -94,6 +129,7 @@ func GetJpgFilename(xmpPath string, extensions []string) string {
 
 }
 
+// GetRawFilenameForJpg transforms a jpg file name into the raw file name that should have been used to generate it
 // _DSC1234_01.jpg -> _DSC1234.ARW
 func GetRawFilenameForJpg(jpgPath string, extension string) string {
 	// Remove directory and extension
@@ -103,6 +139,16 @@ func GetRawFilenameForJpg(jpgPath string, extension string) string {
 	exp := regexp.MustCompile(`(.*)_\d\d`)
 	jpgBasename := exp.ReplaceAllString(basename, "${1}")
 	return fmt.Sprintf("%s%s", jpgBasename, extension)
+}
+
+// GetXmpFilenameForJpg transforms a jpg file name into the xmp file name that should have been used to generate it
+// _DSC1234_01.jpg -> _DSC1234_01.ARW.xmp (does not support _DSC1234_01.xmp format)
+func GetXmpFilenameForJpg(jpgPath string, extension string) (string, bool) {
+	// Remove directory and extension
+	basename := strings.TrimSuffix(filepath.Base(jpgPath), filepath.Ext(jpgPath))
+	exp := regexp.MustCompile(`(.*)_\d\d$`)
+	isVirtualCopy := exp.Match([]byte(basename))
+	return fmt.Sprintf("%s%s.xmp", basename, extension), isVirtualCopy
 }
 
 // /some/dir/_DSC1234_01.xmp -> /some/dir/_DSC1234.ARW

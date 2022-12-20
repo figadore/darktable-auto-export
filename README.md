@@ -19,7 +19,8 @@ delete-missing: false
 in: "./"
 out: "./"
 command: "flatpak run --command=darktable-cli org.darktable.Darktable"
-extension: ".ARW"
+extension:
+  - ".ARW"
 new: false
 # unlock subcommand
 lockdir: ""
