@@ -30,9 +30,10 @@ func TestGetRelativeDir(t *testing.T) {
 		inputPath string
 		want      string
 	}{
-		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW.xmp", ""},
-		{"./the/path/filename.txt", "./", "the/path"},
-		{"/mnt/path/filename.txt", "/mnt", "/path"},
+		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW.xmp", "."},
+		{"./test/src/_DSC1234.ARW", "./test/dst/_DSC4321.jpg", "../src"},
+		{"./the/path/filename.txt", ".", "the/path"},
+		{"/mnt/path/filename.txt", "/mnt", "path"},
 	}
 
 	for _, tt := range tests {
@@ -41,6 +42,31 @@ func TestGetRelativeDir(t *testing.T) {
 			relativeDir := GetRelativeDir(tt.fullPath, tt.inputPath)
 			if relativeDir != tt.want {
 				t.Errorf("got %s, want %s", relativeDir, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripCommonDir(t *testing.T) {
+	var tests = []struct {
+		fullPath  string
+		inputPath string
+		want      string
+	}{
+		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW", "_DSC1234.ARW"},
+		{"./test/src/_DSC1234.ARW", "./test/src/", "_DSC1234.ARW"},
+		{"./test/dst/_DSC1234.jpg", "./test/dst/", "_DSC1234.jpg"},
+		//{"./test/src/_DSC1234.ARW", "./test/dst/", "src/_DSC1234.ARW"},
+		//{"./test/src/_DSC1234.ARW", "./test/dst/_DSC4321.jpg", "src/_DSC1234.ARW"},
+		{"./test/src/_DSC1234.ARW", "./test/", "src/_DSC1234.ARW"},
+	}
+
+	for _, tt := range tests {
+		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.inputPath)
+		t.Run(testname, func(t *testing.T) {
+			stripped := StripSharedDir(tt.fullPath, tt.inputPath)
+			if stripped != tt.want {
+				t.Errorf("got %s, want %s", stripped, tt.want)
 			}
 		})
 	}
@@ -127,7 +153,29 @@ func TestFindJpgsWithoutRaw(t *testing.T) {
 	}
 	for _, tt := range tests {
 		jpgs := FindFilesWithExt("./test/dst", ".jpg")
-		jpgsToDelete := FindJpgsWithoutRaw(jpgs, "test/src", "test/dst", tt.rawExt)
+		raws := FindFilesWithExt("./test/src", ".ARW")
+
+		//fmt.Println("jpgs:", jpgs, "raws:", raws)
+		jpgsToDelete := FindJpgsWithoutRaw(jpgs, raws, "test/src", "test/dst", tt.rawExt)
+		if !reflect.DeepEqual(tt.want, jpgsToDelete) {
+			t.Errorf(`Wanted %s, got %s`, tt.want, jpgsToDelete)
+		}
+	}
+}
+
+func TestFindJpgsWithoutXmp(t *testing.T) {
+	var tests = []struct {
+		rawExt []string
+		want   []string
+	}{
+		{[]string{".arw"}, []string{"test/dst/_DSC1234_02.jpg"}},
+		{[]string{".ARW"}, []string{"test/dst/_DSC1234_02.jpg"}},
+		{[]string{".ARW", ".dng"}, []string{"test/dst/_DSC1234_02.jpg"}},
+	}
+	for _, tt := range tests {
+		jpgs := FindFilesWithExt("./test/dst", ".jpg")
+		//raws := FindFilesWithExt("./test/src", ".ARW")
+		jpgsToDelete := FindJpgsWithoutXmp(jpgs, "test/src", "test/dst", tt.rawExt)
 		if !reflect.DeepEqual(tt.want, jpgsToDelete) {
 			t.Errorf(`Wanted %s, got %s`, tt.want, jpgsToDelete)
 		}

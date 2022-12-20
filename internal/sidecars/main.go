@@ -11,9 +11,19 @@ import (
 	"strings"
 )
 
-func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+func FindJpgsWithoutRaw(jpgs []string, raws []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+	relativeJpgs := make([]string, len(jpgs))
+	for i, jpg := range jpgs {
+		relativeJpgs[i] = StripSharedDir(jpg, outputFolder)
+	}
+	relativeRaws := make([]string, len(raws))
+	for i, raw := range raws {
+		relativeRaws[i] = StripSharedDir(raw, inputFolder)
+	}
+	//fmt.Println("relativeJpgs:", relativeJpgs, "relativeRaws:", relativeRaws)
 	var jpgsToDelete []string
-	for _, jpg := range jpgs {
+	for i, jpg := range relativeJpgs {
+		//fmt.Println("Looking for raw for", jpg)
 		relativeDir := GetRelativeDir(jpg, outputFolder)
 		found := false
 		for _, rawExtension := range rawExtensions {
@@ -23,19 +33,26 @@ func FindJpgsWithoutRaw(jpgs []string, inputFolder, outputFolder string, rawExte
 			rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
 			rawPathUpper := filepath.Join(inputFolder, relativeDir, rawFilenameUpper)
 			// Check for the uppercase and lowercase version of the raw extension
-			if _, err := os.Stat(rawPathLower); err == nil {
-				found = true
-			}
-			if _, err := os.Stat(rawPathUpper); err == nil {
+			if caseInsensitiveContains(relativeRaws, rawPathUpper) || caseInsensitiveContains(relativeRaws, rawPathLower) {
 				found = true
 			}
 		}
 		if !found {
-			jpgsToDelete = append(jpgsToDelete, jpg)
+			jpgsToDelete = append(jpgsToDelete, jpgs[i])
 		}
 	}
-	fmt.Println("Jpgs with no raw:", jpgsToDelete)
+	fmt.Println("Jpgs to delete (no matching raw):", jpgsToDelete)
 	return jpgsToDelete
+}
+
+func caseInsensitiveContains(haystack []string, needle string) bool {
+	//fmt.Println("Checking if", needle, "exists in", haystack)
+	for _, v := range haystack {
+		if strings.EqualFold(needle, v) {
+			return true
+		}
+	}
+	return false
 }
 
 // FindJpgsWithoutXmp scans for jpgs that have no corresponding raw/xmp pair
@@ -68,7 +85,7 @@ func FindJpgsWithoutXmp(jpgs []string, inputFolder, outputFolder string, rawExte
 			jpgsToDelete = append(jpgsToDelete, jpg)
 		}
 	}
-	fmt.Println("Jpgs with no xmp:", jpgsToDelete)
+	fmt.Println("Jpgs to delete (no matching xmp):", jpgsToDelete)
 	return jpgsToDelete
 }
 
@@ -94,24 +111,45 @@ func IsDir(path string) (bool, error) {
 }
 
 // GetRelativeDir returns the directory of fullPath relative to baseDir
-// E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "/some/dir"
-func GetRelativeDir(fullPath, inputPath string) string {
-	var baseDir string
-	isDir, err := IsDir(inputPath)
+// E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "some/dir"
+func GetRelativeDir(fullPath, baseDir string) string {
+	isDir, err := IsDir(baseDir)
 	if err != nil {
-		log.Fatalf("Error getting relative dir for input path '%s': %v", inputPath, err)
+		log.Fatalf("Error getting relative dir for input path '%s': %v", baseDir, err)
 	}
 
-	if isDir {
-		baseDir = inputPath
-	} else {
-		baseDir = filepath.Dir(inputPath)
+	if !isDir {
+		baseDir = filepath.Dir(baseDir)
 	}
+	relativePath, err := filepath.Rel(baseDir, fullPath)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	//for strings.HasPrefix(relativePath, "../") {
+	//	relativePath = strings.TrimPrefix(relativePath, "../")
+	//}
+	//fmt.Printf("trim '%s' off the front of '%s' => '%s'\n", baseDir, fullPath, relativePath)
+	return filepath.Dir(relativePath)
+}
 
-	relativeDir := strings.TrimPrefix(filepath.Dir(fullPath), baseDir)
-	// debug
-	//fmt.Println("Relative dir of", fullPath, "given", baseDir, "is", relativeDir)
-	return relativeDir
+// StripSharedDir returns a path, stripping what it has in common with the second path provided
+// E.g. StripSharedDir("/mnt/some/dir/filename.txt", "/mnt") -> "/some/dir/filename.txt"
+func StripSharedDir(fullPath, baseDir string) string {
+	relativeDir := GetRelativeDir(fullPath, baseDir)
+	//relativePath, err := filepath.Rel(baseDir, fullPath)
+	//if err != nil {
+	//	log.Fatalf("%v", err)
+	//}
+	relativePath := filepath.Join(relativeDir, filepath.Base(fullPath))
+	if relativePath == "." {
+		relativePath = filepath.Base(fullPath)
+	}
+	// Trim any preceding '../'
+	for strings.HasPrefix(relativePath, "../") {
+		relativePath = strings.TrimPrefix(relativePath, "../")
+	}
+	//fmt.Printf("trim '%s' off the front of '%s' => '%s'\n", baseDir, fullPath, relativePath)
+	return relativePath
 }
 
 // _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg
@@ -148,7 +186,8 @@ func GetXmpFilenameForJpg(jpgPath string, extension string) (string, bool) {
 	basename := strings.TrimSuffix(filepath.Base(jpgPath), filepath.Ext(jpgPath))
 	exp := regexp.MustCompile(`(.*)_\d\d$`)
 	isVirtualCopy := exp.Match([]byte(basename))
-	return fmt.Sprintf("%s%s.xmp", basename, extension), isVirtualCopy
+	xmpFilename := fmt.Sprintf("%s%s.xmp", basename, extension)
+	return xmpFilename, isVirtualCopy
 }
 
 // /some/dir/_DSC1234_01.xmp -> /some/dir/_DSC1234.ARW

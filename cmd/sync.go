@@ -91,7 +91,7 @@ func syncDir() error {
 	if viper.GetBool("delete-missing") {
 		fmt.Println("Deleting jpgs for missing raws")
 		jpgs := sidecars.FindFilesWithExt(viper.GetString("out"), ".jpg")
-		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))
+		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, raws, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))
 		jpgsToDelete = append(jpgsToDelete, sidecars.FindJpgsWithoutXmp(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))...)
 		deleteJpgs(jpgsToDelete)
 		fmt.Printf("Deleting %v of %v jpgs", len(jpgsToDelete), len(jpgs))
@@ -180,11 +180,14 @@ func syncFile(path string) error {
 }
 
 func caseInsensitiveContains(haystack []string, needle string) bool {
+	fmt.Println("Checking", haystack, "for", needle)
 	for _, v := range haystack {
 		if strings.EqualFold(needle, v) {
+			fmt.Println("found")
 			return true
 		}
 	}
+	fmt.Println("not found")
 	return false
 }
 
