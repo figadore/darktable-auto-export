@@ -174,8 +174,9 @@ func TestFindJpgsWithoutXmp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		jpgs := FindFilesWithExt("./test/dst", ".jpg")
+		xmps := FindFilesWithExt("./test/src", ".xmp")
 		//raws := FindFilesWithExt("./test/src", ".ARW")
-		jpgsToDelete := FindJpgsWithoutXmp(jpgs, "test/src", "test/dst", tt.rawExt)
+		jpgsToDelete := FindJpgsWithoutXmp(jpgs, xmps, "test/src", "test/dst", tt.rawExt)
 		if !reflect.DeepEqual(tt.want, jpgsToDelete) {
 			t.Errorf(`Wanted %s, got %s`, tt.want, jpgsToDelete)
 		}

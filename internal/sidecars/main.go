@@ -57,27 +57,38 @@ func caseInsensitiveContains(haystack []string, needle string) bool {
 
 // FindJpgsWithoutXmp scans for jpgs that have no corresponding raw/xmp pair
 // This should only affect darktable duplicates, such as _DSC1234_01.ARw.xmp/_DSC1234_01.jpg
-func FindJpgsWithoutXmp(jpgs []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+func FindJpgsWithoutXmp(jpgs, xmps []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+	relativeJpgs := make([]string, len(jpgs))
+	for i, jpg := range jpgs {
+		relativeJpgs[i] = StripSharedDir(jpg, outputFolder)
+	}
+	relativeXmps := make([]string, len(xmps))
+	for i, xmp := range xmps {
+		relativeXmps[i] = StripSharedDir(xmp, inputFolder)
+	}
 	var jpgsToDelete []string
 	for _, jpg := range jpgs {
 		relativeDir := GetRelativeDir(jpg, outputFolder)
 		found := false
 		for _, rawExtension := range rawExtensions {
 			// Check for uppercase and lowercase variations of extension
-			rawFilenameLower, isVirtualCopy := GetXmpFilenameForJpg(jpg, strings.ToLower(rawExtension))
-			rawFilenameUpper, _ := GetXmpFilenameForJpg(jpg, strings.ToUpper(rawExtension))
+			xmpFilenameLower, isVirtualCopy := GetXmpFilenameForJpg(jpg, strings.ToLower(rawExtension))
+			xmpFilenameUpper, _ := GetXmpFilenameForJpg(jpg, strings.ToUpper(rawExtension))
 			if !isVirtualCopy {
 				// skip because this function only cares about virtual copies
 				found = true
 				break
 			}
-			rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
-			rawPathUpper := filepath.Join(inputFolder, relativeDir, rawFilenameUpper)
-			// Check for the uppercase and lowercase version of the raw extension
-			if _, err := os.Stat(rawPathLower); err == nil {
+			xmpPathLower := filepath.Join(inputFolder, relativeDir, xmpFilenameLower)
+			xmpPathUpper := filepath.Join(inputFolder, relativeDir, xmpFilenameUpper)
+			if caseInsensitiveContains(relativeXmps, xmpPathUpper) || caseInsensitiveContains(relativeXmps, xmpPathLower) {
 				found = true
 			}
-			if _, err := os.Stat(rawPathUpper); err == nil {
+			// Check for the uppercase and lowercase version of the xmp extension
+			if _, err := os.Stat(xmpPathLower); err == nil {
+				found = true
+			}
+			if _, err := os.Stat(xmpPathUpper); err == nil {
 				found = true
 			}
 		}
