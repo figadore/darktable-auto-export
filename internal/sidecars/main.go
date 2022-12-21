@@ -11,6 +11,181 @@ import (
 	"strings"
 )
 
+type LinkedImage interface {
+	GetPath() string
+	String() string
+}
+
+type Raw struct {
+	Path ImagePath
+	Xmps map[string]*Xmp
+	Jpgs map[string]*Jpg
+}
+
+func (i Raw) GetPath() string {
+	return i.Path.fullPath
+}
+
+type Xmp struct {
+	Path ImagePath
+	Raw  *Raw
+	Jpg  *Jpg
+}
+
+func (i Xmp) GetPath() string {
+	return i.Path.fullPath
+}
+
+type Jpg struct {
+	Path ImagePath
+	Raw  *Raw
+	Xmp  *Xmp
+}
+
+func (i Jpg) GetPath() string {
+	return i.Path.fullPath
+}
+
+func NewRaw(path ImagePath) *Raw {
+	raw := Raw{
+		Path: path,
+		Xmps: make(map[string]*Xmp),
+		Jpgs: make(map[string]*Jpg),
+	}
+	return &raw
+}
+
+func (raw Raw) String() string {
+	s := fmt.Sprintf("%s", raw.GetPath())
+	for _, xmp := range raw.Xmps {
+		if xmp.Jpg != nil {
+			s = fmt.Sprintf("%v\n  %v => %v", s, xmp.GetPath(), xmp.Jpg.GetPath())
+		} else {
+			s = fmt.Sprintf("%v\n  %v", s, xmp.GetPath())
+		}
+	}
+	//fmt.Println("raw to string called", s)
+	return fmt.Sprintf("%v", s)
+}
+
+func (raw *Raw) AddXmp(xmp *Xmp) {
+	// only add if it doesn't already exist
+	if _, ok := raw.Xmps[xmp.GetPath()]; !ok {
+		raw.Xmps[xmp.GetPath()] = xmp
+		if xmp.Jpg != nil {
+			raw.AddJpg(xmp.Jpg)
+		}
+		xmp.Raw = raw
+	}
+}
+
+func (raw *Raw) AddJpg(jpg *Jpg) {
+	// only add if it doesn't already exist
+	if _, ok := raw.Jpgs[jpg.GetPath()]; !ok {
+		raw.Jpgs[jpg.GetPath()] = jpg
+		if jpg.Xmp != nil {
+			raw.AddXmp(jpg.Xmp)
+		}
+		jpg.Raw = raw
+	}
+}
+
+func NewXmp(path ImagePath) *Xmp {
+	xmp := Xmp{
+		Path: path,
+	}
+	return &xmp
+}
+
+func (xmp Xmp) String() string {
+	s := xmp.GetPath()
+	if xmp.Raw != nil {
+		s = fmt.Sprintf("%v <= %v", s, xmp.Raw.GetPath())
+	}
+	if xmp.Jpg != nil {
+		s = fmt.Sprintf("%v => %v", s, xmp.Jpg.GetPath())
+	}
+	return s
+}
+
+func (xmp *Xmp) AddJpg(jpg *Jpg) {
+	// only add if it doesn't already exist
+	xmp.Jpg = jpg
+	jpg.Xmp = xmp
+}
+
+func (xmp *Xmp) IsVirtualCopy() bool {
+	basename := xmp.GetBasename()
+	exp := regexp.MustCompile(`(.*)_\d\d$`)
+	isVirtualCopy := exp.Match([]byte(basename))
+	return isVirtualCopy
+}
+
+// Gets file name without directory or extension(s)
+func (xmp *Xmp) GetBasename() string {
+	basename := filepath.Base(xmp.GetPath())
+	for filepath.Ext(basename) != "" {
+		basename = strings.TrimSuffix(basename, filepath.Ext(basename))
+	}
+	return basename
+}
+
+func NewJpg(path ImagePath) *Jpg {
+	jpg := Jpg{
+		Path: path,
+	}
+	return &jpg
+}
+
+func (jpg Jpg) String() string {
+	s := jpg.GetPath()
+	if jpg.Xmp != nil {
+		s = fmt.Sprintf("%v <= %v", s, jpg.Xmp.GetPath())
+	}
+	if jpg.Raw != nil {
+		s = fmt.Sprintf("%v <= %v", s, jpg.Raw.GetPath())
+	}
+	return s
+}
+
+// List all raws, xmps, and jpgs found in the sources and exports dir
+// Each returned object includes any linked objects that were detected
+func FindImages(sourcesDir, exportsDir string, extensions []string) []Raw {
+	var raws []Raw
+	var rawPaths []string
+	// Find all files with any of the given extensions
+	for _, ext := range extensions {
+		rawPaths = append(rawPaths, FindFilesWithExt(sourcesDir, ext)...)
+	}
+	xmpPaths := FindFilesWithExt(sourcesDir, ".xmp")
+	jpgPaths := FindFilesWithExt(sourcesDir, ".jpg")
+	// Create a new Raw object for each found path
+	for _, rawPath := range rawPaths {
+		raw := NewRaw(ImagePath{fullPath: rawPath, basePath: sourcesDir})
+		raws = append(raws, *raw)
+	}
+	var xmps []Xmp
+	for _, xmpPath := range xmpPaths {
+		xmp := NewXmp(ImagePath{fullPath: xmpPath, basePath: sourcesDir})
+		xmps = append(xmps, *xmp)
+		//jpg := NewJpg(jpgPath)
+		//xmp.AddJpg(jpg)
+		//raws[0].AddXmp(xmp)
+	}
+	var jpgs []Jpg
+	for _, jpgPath := range jpgPaths {
+		jpg := NewJpg(ImagePath{fullPath: jpgPath, basePath: exportsDir})
+		jpgs = append(jpgs, *jpg)
+	}
+	linkImages(raws, xmps, jpgs)
+	return raws
+}
+
+func linkImages(raws []Raw, xmps []Xmp, jpgs []Jpg) {
+	// TODO
+	raws[0].AddXmp(&xmps[0])
+}
+
 func FindJpgsWithoutRaw(jpgs []string, raws []string, inputFolder, outputFolder string, rawExtensions []string) []string {
 	relativeJpgs := make([]string, len(jpgs))
 	for i, jpg := range jpgs {
@@ -100,26 +275,56 @@ func FindJpgsWithoutXmp(jpgs, xmps []string, inputFolder, outputFolder string, r
 	return jpgsToDelete
 }
 
-func IsDir(path string) (bool, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return false, err
+// FindSourcesWithoutJpg looks for any raw or xmp files where a jpg does not exist
+func FindSourcesWithoutJpg(raws, xmps, jpgs []string, inputFolder, outputFolder string, rawExtensions []string) []string {
+	relativeJpgs := make([]string, len(jpgs))
+	for i, jpg := range jpgs {
+		relativeJpgs[i] = StripSharedDir(jpg, outputFolder)
 	}
-	defer file.Close()
-	// This returns an *os.FileInfo type
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return false, err
+	relativeXmps := make([]string, len(xmps))
+	for i, xmp := range xmps {
+		relativeXmps[i] = StripSharedDir(xmp, inputFolder)
 	}
-
-	// IsDir is short for fileInfo.Mode().IsDir()
-	if fileInfo.IsDir() {
-		return true, nil
-	} else {
-		// not a directory
-		return false, nil
+	relativeRaws := make([]string, len(raws))
+	for i, raw := range raws {
+		relativeRaws[i] = StripSharedDir(raw, inputFolder)
 	}
+	// If raw file has no jpgs, add to list (new findjpgs fn)
+	// If virtual copy xmp has no jpgs, add xmp to list
+	// Also add raw file if no other xmps? what happens when 1.arw and 1_01.arw.xmp are all that exist?
+	return []string{}
 }
+
+// IsDir checks whether a path is a directory
+// This implementation is naive, assuming anything not matching  "*.*" is a directory
+func IsDir(path string) (bool, error) {
+	exp := regexp.MustCompile(`^.+\..+$`)
+	isFile := exp.Match([]byte(path))
+	return !isFile, nil
+}
+
+// IsDir checks whether a path is a directory
+// This implementation depends on i/o and requires files to actually exist
+//func IsDir(path string) (bool, error) {
+//	file, err := os.Open(path)
+//	if err != nil {
+//		return false, err
+//	}
+//	defer file.Close()
+//	// This returns an *os.FileInfo type
+//	fileInfo, err := file.Stat()
+//	if err != nil {
+//		return false, err
+//	}
+//
+//	// IsDir is short for fileInfo.Mode().IsDir()
+//	if fileInfo.IsDir() {
+//		return true, nil
+//	} else {
+//		// not a directory
+//		return false, nil
+//	}
+//}
 
 // GetRelativeDir returns the directory of fullPath relative to baseDir
 // E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "some/dir"

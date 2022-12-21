@@ -200,3 +200,80 @@ func TestGetRawPathForXmp(t *testing.T) {
 		}
 	}
 }
+
+//func TestFindImages(t *testing.T) {
+//	raws := FindImages("test/src", "test/dst", []string{".ARW", ".dng"})
+//	// Print all raws
+//	for _, raw := range raws {
+//		fmt.Println(raw)
+//		fmt.Println("xmps")
+//		for _, xmp := range raw.Xmps {
+//			fmt.Println("xmp:", xmp)
+//			fmt.Println("jpg:", xmp.Jpg)
+//		}
+//		fmt.Println("jpgs")
+//		for _, jpg := range raw.Jpgs {
+//			fmt.Println("jpg:", jpg)
+//			fmt.Println("xmp:", jpg.Xmp)
+//		}
+//	}
+//}
+
+func TestLinkImages(t *testing.T) {
+	rawPath1 := ImagePath{fullPath: "/src/_DSC0001.ARW", basePath: "/src"}
+	xmpPath1 := ImagePath{fullPath: "/src/_DSC0001.ARW.xmp", basePath: "/src"}
+	//xmpPath2 := ImagePath{fullPath: "/src/_DSC0001_01.ARW.xmp", basePath: "/src"}
+	jpgPath1 := ImagePath{fullPath: "/dst/_DSC0001.jpg", basePath: "/dst"}
+	//jpgPath2 := ImagePath{fullPath: "/dst/_DSC0001_01.jpg", basePath: "/dst"}
+
+	linkedRaw1 := NewRaw(rawPath1)
+	linkedRaw1.AddXmp(NewXmp(xmpPath1))
+	linkedRaw1.AddJpg(NewJpg(jpgPath1))
+
+	var tests = []struct {
+		raws    []ImagePath
+		xmps    []ImagePath
+		jpgs    []ImagePath
+		wantRaw []Raw
+	}{
+		// raw with 1 jpg 1 xmp
+		{
+			[]ImagePath{rawPath1},
+			[]ImagePath{xmpPath1},
+			[]ImagePath{jpgPath1},
+			[]Raw{*linkedRaw1},
+		},
+		// raw with no xmp or jpg
+		// raw with 1 xmp no jpg
+		// raw with 1 jpg no xmp
+		// raw with 2 xmp 2 jpg
+		// raw with 2 xmp 3 jpg
+		// xmp with no raw or jpg
+		// xmp with raw and jpg
+		// xmp with raw no jpg
+		// xmp with jpg no raw
+		// jpg with no xmp or raw
+		// jpg with xmp no raw
+		// jpg with raw no xmp
+	}
+	for _, tt := range tests {
+		var raws []Raw
+		for _, raw := range tt.raws {
+			raws = append(raws, *NewRaw(raw))
+		}
+		var xmps []Xmp
+		for _, xmp := range tt.xmps {
+			xmps = append(xmps, *NewXmp(xmp))
+		}
+		var jpgs []Jpg
+		for _, jpg := range tt.jpgs {
+			jpgs = append(jpgs, *NewJpg(jpg))
+		}
+		linkImages(raws, xmps, jpgs)
+		for i, want := range tt.wantRaw {
+			if want.String() != raws[i].String() {
+				t.Errorf(`Wanted %s, got %s`, want, raws[i])
+			}
+		}
+	}
+}
