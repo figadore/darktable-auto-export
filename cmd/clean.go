@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/figadore/darktable-auto-export/internal/sidecars"
+	"github.com/figadore/darktable-auto-export/internal/linkedimage"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -22,16 +22,16 @@ func clean(cmd *cobra.Command, args []string) {
 	inDir := viper.GetString("in")
 	outDir := viper.GetString("out")
 	extensions := viper.GetStringSlice("extension")
-	jpgs := sidecars.FindFilesWithExt(outDir, ".jpg")
-	xmps := sidecars.FindFilesWithExt(inDir, ".xmp")
+	jpgs := linkedimage.FindFilesWithExt(outDir, ".jpg")
+	xmps := linkedimage.FindFilesWithExt(inDir, ".xmp")
 	var raws []string
 	// For each defined extension, add to the list of raws
 	for _, ext := range extensions {
-		raws = append(raws, sidecars.FindFilesWithExt(inDir, ext)...)
+		raws = append(raws, linkedimage.FindFilesWithExt(inDir, ext)...)
 	}
 	fmt.Println(jpgs, xmps)
 	// for each jpg without a matching raw or xmp, aggregate the raw and/or xmp (make sure to get the xmps if deleting the raw)
-	sourcesToDelete := sidecars.FindSourcesWithoutJpg()
+	sourcesToDelete := linkedimage.FindSourcesWithoutJpg()
 
 	// list all raw and xmp files to delete. prompt for confirmation
 	for _, sourceFile := range sourcesToDelete {

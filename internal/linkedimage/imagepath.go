@@ -1,4 +1,4 @@
-package sidecars
+package linkedimage
 
 import (
 	"log"
