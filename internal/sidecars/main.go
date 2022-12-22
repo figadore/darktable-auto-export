@@ -64,11 +64,18 @@ func (raw Raw) String() string {
 			s = fmt.Sprintf("%v\n  %v", s, xmp.GetPath())
 		}
 	}
-	//fmt.Println("raw to string called", s)
+	for _, jpg := range raw.Jpgs {
+		if jpg.Xmp != nil {
+			s = fmt.Sprintf("%v\n  %v => %v", s, jpg.GetPath(), jpg.Xmp.GetPath())
+		} else {
+			s = fmt.Sprintf("%v\n  %v", s, jpg.GetPath())
+		}
+	}
 	return fmt.Sprintf("%v", s)
 }
 
 func (raw *Raw) AddXmp(xmp *Xmp) {
+	// only add if it doesn't already exist
 	// only add if it doesn't already exist
 	if _, ok := raw.Xmps[xmp.GetPath()]; !ok {
 		raw.Xmps[xmp.GetPath()] = xmp
@@ -181,9 +188,45 @@ func FindImages(sourcesDir, exportsDir string, extensions []string) []Raw {
 	return raws
 }
 
+// For each raw, find corresponding xmps and jpgs
+// For each xmp, find corresponding jpgs and raws (redundant?)
+// For each jpg, find corresponding xmps (redundant?) and raws (redundant?)
 func linkImages(raws []Raw, xmps []Xmp, jpgs []Jpg) {
-	// TODO
-	raws[0].AddXmp(&xmps[0])
+	for _, raw := range raws {
+		for _, xmp := range xmps {
+			if xmpMatchesRaw(xmp, raw) {
+				raw.AddXmp(&xmp)
+			}
+		}
+	}
+}
+
+func xmpMatchesRaw(xmp Xmp, raw Raw) bool {
+	xmpPath := xmp.GetPath()
+	base := raw.Path.GetBasename()
+	ext := filepath.Ext(raw.GetPath())
+	dir := raw.Path.GetFullDir()
+	// basename.xmp
+	exp := regexp.MustCompile(fmt.Sprintf(`^%s/%s\.xmp$`, dir, base))
+	if exp.Match([]byte(xmpPath)) {
+		return true
+	}
+	// basename.ext.xmp
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s(?i)%s(?-i)\.xmp$`, dir, base, ext))
+	if exp.Match([]byte(xmpPath)) {
+		return true
+	}
+	// basename_XX.xmp
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d\.xmp$`, dir, base))
+	if exp.Match([]byte(xmpPath)) {
+		return true
+	}
+	// basename_XX.ext.xmp
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d(?i)%s(?-i)\.xmp$`, dir, base, ext))
+	if exp.Match([]byte(xmpPath)) {
+		return true
+	}
+	return false
 }
 
 func FindJpgsWithoutRaw(jpgs []string, raws []string, inputFolder, outputFolder string, rawExtensions []string) []string {

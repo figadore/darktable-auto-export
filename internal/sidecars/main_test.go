@@ -227,14 +227,21 @@ func TestLinkImages(t *testing.T) {
 	//jpgPath2 := ImagePath{fullPath: "/dst/_DSC0001_01.jpg", basePath: "/dst"}
 
 	linkedRaw1 := NewRaw(rawPath1)
-	linkedRaw1.AddXmp(NewXmp(xmpPath1))
-	linkedRaw1.AddJpg(NewJpg(jpgPath1))
+	// TODO this is problematic, xmp and jpg not linked, make it more fail-safe
+	//linkedRaw1.AddXmp(NewXmp(xmpPath1))
+	//linkedRaw1.AddJpg(NewJpg(jpgPath1))
+	linkedXmp1 := NewXmp(xmpPath1)
+	linkedJpg1 := NewJpg(jpgPath1)
+	linkedXmp1.AddJpg(linkedJpg1)
+	linkedRaw1.AddXmp(linkedXmp1)
 
 	var tests = []struct {
 		raws    []ImagePath
 		xmps    []ImagePath
 		jpgs    []ImagePath
 		wantRaw []Raw
+		wantXmp []Xmp
+		wantJpg []Jpg
 	}{
 		// raw with 1 jpg 1 xmp
 		{
@@ -242,6 +249,8 @@ func TestLinkImages(t *testing.T) {
 			[]ImagePath{xmpPath1},
 			[]ImagePath{jpgPath1},
 			[]Raw{*linkedRaw1},
+			[]Xmp{*linkedXmp1},
+			[]Jpg{*linkedJpg1},
 		},
 		// raw with no xmp or jpg
 		// raw with 1 xmp no jpg
@@ -270,10 +279,39 @@ func TestLinkImages(t *testing.T) {
 			jpgs = append(jpgs, *NewJpg(jpg))
 		}
 		linkImages(raws, xmps, jpgs)
+		// TODO sort these before compare?
 		for i, want := range tt.wantRaw {
 			if want.String() != raws[i].String() {
 				t.Errorf(`Wanted %s, got %s`, want, raws[i])
+			} else {
+				t.Errorf(`Wanted %s, got %s`, want, raws[i])
 			}
+		}
+		// TODO compare wanted xmps and jpgs too
+	}
+}
+
+func TestXmpMatchesRaw(t *testing.T) {
+	var tests = []struct {
+		xmpPath string
+		rawPath string
+		want    bool
+	}{
+
+		{"/some/dir/_DSC1234_01.arw.xmp", "/some/dir/_DSC1234.ARW", true},
+		{"/some/dir/_DSC1234_01.xmp", "/some/dir/_DSC1234.ARW", true},
+		{"/some/dir/_DSC1234_01.ARW.xmp", "/some/dir/_DSC1234.ARW", true},
+		{"/some/dir/_DSC1234.ARW.xmp", "/some/dir/_DSC1234.ARW", true},
+		{"/some/dir/_DSC1234.xmp", "/some/dir/_DSC1234.ARW", true},
+		{"/some/dir/_DSC1234_012.arw.xmp", "/some/dir/_DSC1234.ARW", false},
+		{"/some/dir/_DSC0234.xmp", "/some/dir/_DSC1234.ARW", false},
+	}
+	for _, tt := range tests {
+		xmp := NewXmp(ImagePath{fullPath: tt.xmpPath, basePath: tt.xmpPath})
+		raw := NewRaw(ImagePath{fullPath: tt.rawPath, basePath: tt.rawPath})
+		matches := xmpMatchesRaw(*xmp, *raw)
+		if tt.want != matches {
+			t.Errorf(`Wanted %v, got %v`, tt.want, matches)
 		}
 	}
 }
