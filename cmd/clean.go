@@ -22,20 +22,52 @@ func clean(cmd *cobra.Command, args []string) {
 	inDir := viper.GetString("in")
 	outDir := viper.GetString("out")
 	extensions := viper.GetStringSlice("extension")
-	jpgs := linkedimage.FindFilesWithExt(outDir, ".jpg")
-	xmps := linkedimage.FindFilesWithExt(inDir, ".xmp")
-	var raws []string
-	// For each defined extension, add to the list of raws
-	for _, ext := range extensions {
-		raws = append(raws, linkedimage.FindFilesWithExt(inDir, ext)...)
+	raws, xmps, _ := linkedimage.FindImages(inDir, outDir, extensions)
+
+	// Trace
+	// Print all raws
+	for _, raw := range raws {
+		fmt.Println(raw)
+		//fmt.Println("xmps")
+		//for _, xmp := range raw.Xmps {
+		//	fmt.Println("xmp:", xmp)
+		//	fmt.Println("jpg:", xmp.Jpg)
+		//}
+		//fmt.Println("jpgs")
+		//for _, jpg := range raw.Jpgs {
+		//	fmt.Println("jpg:", jpg)
+		//	fmt.Println("xmp:", jpg.Xmp)
+		//}
 	}
-	fmt.Println(jpgs, xmps)
-	// for each jpg without a matching raw or xmp, aggregate the raw and/or xmp (make sure to get the xmps if deleting the raw)
-	sourcesToDelete := linkedimage.FindSourcesWithoutJpg()
+
+	rawsToDelete := make(map[string]linkedimage.Raw)
+	xmpsToDelete := make(map[string]linkedimage.Xmp)
+	// for each jpg without a matching raw or xmp, aggregate the raw and/or xmp (making sure to get the xmps if deleting the raw)
+	for i := range raws {
+		// Assign raw to a variable here instead of iteration variables because loops copy the values
+		raw := raws[i]
+		if len(raw.Jpgs) == 0 {
+			rawsToDelete[raw.GetPath()] = raws[i]
+			// Clean up any orphan xmps
+			for j := range raw.Xmps {
+				xmp := raw.Xmps[j]
+				xmpsToDelete[xmp.GetPath()] = *xmp
+			}
+		}
+	}
+	for i := range xmps {
+		xmp := xmps[i]
+		if xmp.Jpg == nil {
+			xmpsToDelete[xmp.GetPath()] = xmp
+		}
+	}
 
 	// list all raw and xmp files to delete. prompt for confirmation
-	for _, sourceFile := range sourcesToDelete {
-		fmt.Println("Delete", sourceFile)
+	for k := range rawsToDelete {
+		fmt.Println("Delete raw", k)
+	}
+	for k := range xmpsToDelete {
+		fmt.Println("Delete xmp", k)
 	}
 
 	// if "move" selected at prompt, stage files for deletion in a folder. keep a log so it can be undone

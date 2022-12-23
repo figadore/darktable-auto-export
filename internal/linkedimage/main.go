@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -40,14 +41,28 @@ func NewRaw(path ImagePath) *Raw {
 
 func (raw Raw) String() string {
 	s := fmt.Sprintf("%s", raw.GetPath())
-	for _, xmp := range raw.Xmps {
+	// Iterate map keys deterministically
+	// Get keys, sort keys, then access using sorted keys
+	xmpKeys := make([]string, 0)
+	for k := range raw.Xmps {
+		xmpKeys = append(xmpKeys, k)
+	}
+	sort.Strings(xmpKeys)
+	for _, key := range xmpKeys {
+		xmp := raw.Xmps[key]
 		if xmp.Jpg != nil {
 			s = fmt.Sprintf("%v\n  %v => %v", s, xmp.GetPath(), xmp.Jpg.GetPath())
 		} else {
 			s = fmt.Sprintf("%v\n  %v", s, xmp.GetPath())
 		}
 	}
-	for _, jpg := range raw.Jpgs {
+	jpgKeys := make([]string, 0)
+	for k := range raw.Jpgs {
+		jpgKeys = append(jpgKeys, k)
+	}
+	sort.Strings(jpgKeys)
+	for _, key := range jpgKeys {
+		jpg := raw.Jpgs[key]
 		if jpg.Xmp != nil {
 			s = fmt.Sprintf("%v\n  %v => %v", s, jpg.GetPath(), jpg.Xmp.GetPath())
 		} else {
@@ -246,7 +261,7 @@ func (jpg Jpg) String() string {
 
 // List all raws, xmps, and jpgs found in the sources and exports dir
 // Each returned object includes any linked objects that were detected
-func FindImages(sourcesDir, exportsDir string, extensions []string) []Raw {
+func FindImages(sourcesDir, exportsDir string, extensions []string) ([]Raw, []Xmp, []Jpg) {
 	var raws []Raw
 	var rawPaths []string
 	// Find all files with any of the given extensions
@@ -254,7 +269,7 @@ func FindImages(sourcesDir, exportsDir string, extensions []string) []Raw {
 		rawPaths = append(rawPaths, FindFilesWithExt(sourcesDir, ext)...)
 	}
 	xmpPaths := FindFilesWithExt(sourcesDir, ".xmp")
-	jpgPaths := FindFilesWithExt(sourcesDir, ".jpg")
+	jpgPaths := FindFilesWithExt(exportsDir, ".jpg")
 	// Create a new Raw object for each found path
 	for _, rawPath := range rawPaths {
 		raw := NewRaw(ImagePath{fullPath: rawPath, basePath: sourcesDir})
@@ -274,7 +289,10 @@ func FindImages(sourcesDir, exportsDir string, extensions []string) []Raw {
 		jpgs = append(jpgs, *jpg)
 	}
 	linkImages(raws, xmps, jpgs)
-	return raws
+	//for _, jpg := range jpgs {
+	//	fmt.Println(jpg)
+	//}
+	return raws, xmps, jpgs
 }
 
 // For each raw, find corresponding xmps and jpgs
@@ -297,6 +315,16 @@ func linkImages(raws []Raw, xmps []Xmp, jpgs []Jpg) {
 		for j, jpg := range jpgs {
 			if jpgMatchesXmp(jpg, xmp) {
 				xmps[i].LinkJpg(&jpgs[j])
+			}
+		}
+	}
+	for i, jpg := range jpgs {
+		for j, raw := range raws {
+			if jpgMatchesRaw(jpg, raw) {
+				jpgs[i].LinkRaw(&raws[j])
+				//	fmt.Println("found raw for jpg", jpg, ":", raw)
+				//} else {
+				//	fmt.Println("\nr-", raw.GetPath(), "does not match jpg", jpg)
 			}
 		}
 	}
@@ -347,22 +375,22 @@ func jpgMatchesRaw(jpg Jpg, raw Raw) bool {
 	ext := filepath.Ext(raw.GetPath())
 	dir := raw.Path.GetRelativeDir()
 	// basename.jpg
-	exp := regexp.MustCompile(fmt.Sprintf(`^%s/%s\.jpg$`, dir, base))
+	exp := regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s\.jpg$`, dir, base))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename.ext.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s(?i)%s(?-i)\.jpg$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s(?i)%s(?-i)\.jpg$`, dir, base, ext))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename_XX.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d\.jpg$`, dir, base))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s_\d\d\.jpg$`, dir, base))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename_XX.ext.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d(?i)%s(?-i)\.jpg$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s_\d\d(?i)%s(?-i)\.jpg$`, dir, base, ext))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
@@ -456,26 +484,6 @@ func FindJpgsWithoutXmp(jpgs, xmps []string, inputFolder, outputFolder string, r
 	}
 	fmt.Println("Jpgs to delete (no matching xmp):", jpgsToDelete)
 	return jpgsToDelete
-}
-
-// FindSourcesWithoutJpg looks for any raw or xmp files where a jpg does not exist
-func FindSourcesWithoutJpg(raws, xmps, jpgs []string, inputFolder, outputFolder string, rawExtensions []string) []string {
-	relativeJpgs := make([]string, len(jpgs))
-	for i, jpg := range jpgs {
-		relativeJpgs[i] = StripSharedDir(jpg, outputFolder)
-	}
-	relativeXmps := make([]string, len(xmps))
-	for i, xmp := range xmps {
-		relativeXmps[i] = StripSharedDir(xmp, inputFolder)
-	}
-	relativeRaws := make([]string, len(raws))
-	for i, raw := range raws {
-		relativeRaws[i] = StripSharedDir(raw, inputFolder)
-	}
-	// If raw file has no jpgs, add to list (new findjpgs fn)
-	// If virtual copy xmp has no jpgs, add xmp to list
-	// Also add raw file if no other xmps? what happens when 1.arw and 1_01.arw.xmp are all that exist?
-	return []string{}
 }
 
 // IsDir checks whether a path is a directory

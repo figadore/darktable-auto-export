@@ -370,7 +370,6 @@ func TestLinkImages(t *testing.T) {
 			}
 			linkImages(raws, xmps, jpgs)
 			wantRaw, wantXmp, wantJpg := tt.setup()
-			// TODO sort these before compare?
 			for i, want := range wantRaw {
 				if want.String() != raws[i].String() {
 					t.Errorf("Raw wanted \n%s\nbut got \n%s", want, raws[i])
@@ -462,6 +461,7 @@ func TestJpgMatchesRaw(t *testing.T) {
 		{"/some/dst/dir/_DSC1234_01.jpg", "/some/dst", "/some/src/dir/_DSC1234_01", "/some/src", true},
 		{"/some/dst/dir/_DSC1234.jpg", "/some/dst", "/some/src/dir/_DSC1234.ARW", "/some/src", true},
 		{"/some/dst/dir/_DSC1234_01.jpg", "/some/dst", "/some/src/dir/_DSC1234_02", "/some/src", false},
+		{"/some/dst/dir/_DSC0018.jpg", "/some/dst/dir", "/some/dst/dir/_DSC0018.ARW", "/some/dst/dir", true},
 	}
 	for _, tt := range tests {
 		testname := fmt.Sprintf("%s==%s", tt.rawPath, tt.jpgPath)
