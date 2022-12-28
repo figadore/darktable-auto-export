@@ -41,6 +41,7 @@ func init() {
 	syncCmd.Flags().StringP("command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
 	syncCmd.Flags().StringSliceP("extension", "e", []string{".ARW"}, "Extension of raw files")
 	syncCmd.Flags().BoolP("new", "n", false, "Only export when target jpg does not exist")
+	syncCmd.Flags().Bool("dry-run", false, "Show actions that would be performed, but don't do them")
 	syncCmd.Flags().BoolP("delete-missing", "d", false, `Delete jpgs where corresponding raw files are missing. This is useful for darktable workflows where editing and culling can be done at any time, not just up front. *warning* This will delete all jpgs in the output directory where a corresponding raw file with the specified extension cannot be found! Only use this for directories that are exclusively for this workflow, and where the source files stay where they are/were.
 `)
 
@@ -119,6 +120,7 @@ func syncRaw(raw string) error {
 		RawPath:    raw,
 		OutputPath: outputPath,
 		OnlyNew:    viper.GetBool("new"),
+		DryRun:     viper.GetBool("dry-run"),
 	}
 	if len(xmps) == 0 {
 		fmt.Println("No xmp files found, applying default settings")
@@ -162,6 +164,7 @@ func syncFile(path string) error {
 			OnlyNew:    viper.GetBool("new"),
 			OutputPath: outputPath,
 			XmpPath:    xmp,
+			DryRun:     viper.GetBool("dry-run"),
 		}
 		err = darktable.Export(params)
 		if err != nil {
@@ -194,10 +197,15 @@ func caseInsensitiveContains(haystack []string, needle string) bool {
 
 func deleteJpgs(jpgs []string) {
 	for _, jpgPath := range jpgs {
-		err := os.Remove(jpgPath)
-		if err != nil {
-			log.Fatalf("Error deleting jpg: %v", err)
-			return
+		if viper.GetBool("dry-run") {
+			fmt.Println("Remove", jpgPath)
+		} else {
+			err := os.Remove(jpgPath)
+			if err != nil {
+				log.Fatalf("Error deleting jpg: %v", err)
+				return
+			}
+
 		}
 	}
 }

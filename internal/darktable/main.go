@@ -15,6 +15,7 @@ type ExportParams struct {
 	XmpPath    string
 	OutputPath string
 	OnlyNew    bool
+	DryRun     bool
 }
 
 func Export(params ExportParams) error {
@@ -38,7 +39,7 @@ func Export(params ExportParams) error {
 	args = append(args, tmpPath)
 	// Uncomment this line to do a dry run (maybe turn this into a param, but be sure to include dry run deleting files)
 	//args = append([]string{"echo"}, args...)
-	err := runCmd(args)
+	err := runCmd(args, params.DryRun)
 	if err != nil {
 		return err
 	}
@@ -47,21 +48,31 @@ func Export(params ExportParams) error {
 	// other than these commands
 	//fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
-	runCmd(args)
+	runCmd(args, params.DryRun)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
-	runCmd(args)
+	runCmd(args, params.DryRun)
 	args = []string{"rm", tmpPath}
-	runCmd(args)
+	runCmd(args, params.DryRun)
 	return nil
 }
 
-func runCmd(args []string) error {
+func runCmd(args []string, dryRun bool) error {
 	remaining := args[1:]
 	fmt.Println(args)
-	cmd := exec.Command(args[0], remaining...)
+	var cmd *exec.Cmd
+	if dryRun {
+		cmd = exec.Command("echo", args...)
+	} else {
+		cmd = exec.Command(args[0], remaining...)
+	}
 	stdout, err := cmd.CombinedOutput()
 	if len(stdout) != 0 {
-		fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+		if dryRun {
+			//fmt.Print(string(stdout))
+		} else {
+			fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+
+		}
 	}
 	if err != nil {
 		fmt.Println("cmd error", err.Error())

@@ -80,6 +80,7 @@ func init() {
 	cleanCmd.Flags().StringP("in", "i", "./", "Directory or file of raw image(s)")
 	cleanCmd.Flags().StringP("out", "o", "./", "Directory where jpgs exist")
 	cleanCmd.Flags().StringSliceP("extension", "e", []string{".ARW"}, "Extension of raw files")
+	cleanCmd.Flags().Bool("dry-run", false, "Show actions that would be performed, but don't do them")
 
 	viper.SetConfigName("config")
 	// Is viper.SetConfigType() needed here?
