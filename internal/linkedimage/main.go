@@ -409,15 +409,14 @@ func FindJpgsWithoutRaw(jpgs []string, raws []string, inputFolder, outputFolder 
 	//fmt.Println("relativeJpgs:", relativeJpgs, "relativeRaws:", relativeRaws)
 	var jpgsToDelete []string
 	for i, jpg := range relativeJpgs {
-		//fmt.Println("Looking for raw for", jpg)
-		relativeDir := GetRelativeDir(jpg, outputFolder)
+		relativeDir := filepath.Dir(jpg)
 		found := false
 		for _, rawExtension := range rawExtensions {
 			// Check for uppercase and lowercase variations of extension
 			rawFilenameLower := GetRawFilenameForJpg(jpg, strings.ToLower(rawExtension))
 			rawFilenameUpper := GetRawFilenameForJpg(jpg, strings.ToUpper(rawExtension))
-			rawPathLower := filepath.Join(inputFolder, relativeDir, rawFilenameLower)
-			rawPathUpper := filepath.Join(inputFolder, relativeDir, rawFilenameUpper)
+			rawPathLower := filepath.Join(relativeDir, rawFilenameLower)
+			rawPathUpper := filepath.Join(relativeDir, rawFilenameUpper)
 			// Check for the uppercase and lowercase version of the raw extension
 			if caseInsensitiveContains(relativeRaws, rawPathUpper) || caseInsensitiveContains(relativeRaws, rawPathLower) {
 				found = true
@@ -530,7 +529,7 @@ func GetRelativeDir(fullPath, baseDir string) string {
 	}
 	relativePath, err := filepath.Rel(baseDir, fullPath)
 	if err != nil {
-		log.Fatalf("%v", err)
+		log.Fatalf("Error getting relative path for %s in %s, %v", fullPath, baseDir, err)
 	}
 	//for strings.HasPrefix(relativePath, "../") {
 	//	relativePath = strings.TrimPrefix(relativePath, "../")

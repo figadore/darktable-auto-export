@@ -128,6 +128,7 @@ func syncRaw(raw string) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println()
 	} else {
 		for _, xmp := range xmps {
 			fmt.Println("Sync xmp file", xmp)
@@ -170,6 +171,7 @@ func syncFile(path string) error {
 		if err != nil {
 			return err
 		}
+		fmt.Println()
 	// raw
 	case caseInsensitiveContains(viper.GetStringSlice("extension"), ext):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
