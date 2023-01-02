@@ -141,6 +141,7 @@ func (raw *Raw) Delete(dryRun bool) error {
 	if err != nil {
 		return err
 	}
+	// Unlink
 	for _, xmp := range raw.Xmps {
 		xmp.Raw = nil
 	}
@@ -247,13 +248,14 @@ func (xmp *Xmp) Delete(dryRun bool) error {
 	if err != nil {
 		return err
 	}
+	// Unlink
 	if xmp.Jpg != nil {
 		xmp.Jpg.Xmp = nil
 	}
 	if xmp.Raw != nil {
 		raw := xmp.Raw
-		if _, ok := raw.Xmps[xmp.GetPath()]; !ok {
-			raw.Xmps[xmp.GetPath()] = nil
+		if _, ok := raw.Xmps[xmp.GetPath()]; ok {
+			delete(raw.Xmps, xmp.GetPath())
 		}
 	}
 	return nil
@@ -326,6 +328,28 @@ func (jpg Jpg) String() string {
 		s = fmt.Sprintf("%v <= %v", s, jpg.Raw.GetPath())
 	}
 	return s
+}
+
+func (jpg *Jpg) Delete(dryRun bool) error {
+	if dryRun {
+		fmt.Println("Delete", jpg.GetPath())
+		return nil
+	}
+	err := os.Remove(jpg.GetPath())
+	if err != nil {
+		return err
+	}
+	// Unlink
+	if jpg.Xmp != nil {
+		jpg.Xmp.Jpg = nil
+	}
+	if jpg.Raw != nil {
+		raw := jpg.Raw
+		if _, ok := raw.Jpgs[jpg.GetPath()]; ok {
+			delete(raw.Jpgs, jpg.GetPath())
+		}
+	}
+	return nil
 }
 
 // List all raws, xmps, and jpgs found in the sources and exports dir
