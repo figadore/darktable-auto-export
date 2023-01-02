@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
+
+	"log"
 
 	"github.com/figadore/darktable-auto-export/internal/linkedimage"
 	"github.com/spf13/cobra"
@@ -40,18 +45,15 @@ func clean(cmd *cobra.Command, args []string) {
 		//}
 	}
 
-	rawsToDelete := make(map[string]linkedimage.Raw)
-	xmpsToDelete := make(map[string]linkedimage.Xmp)
+	rawsToDelete := make(map[string]*linkedimage.Raw)
+	xmpsToDelete := make(map[string]*linkedimage.Xmp)
 	// for each jpg without a matching raw or xmp, aggregate the raw and/or xmp (making sure to get the xmps if deleting the raw)
-	for i := range raws {
-		// Assign raw to a variable here instead of iteration variables because loops copy the values
-		raw := raws[i]
+	for _, raw := range raws {
 		if len(raw.Jpgs) == 0 {
-			rawsToDelete[raw.GetPath()] = raws[i]
+			rawsToDelete[raw.GetPath()] = raw
 			// Clean up any orphan xmps
-			for j := range raw.Xmps {
-				xmp := raw.Xmps[j]
-				xmpsToDelete[xmp.GetPath()] = *xmp
+			for _, xmp := range raw.Xmps {
+				xmpsToDelete[xmp.GetPath()] = xmp
 			}
 		}
 	}
@@ -69,10 +71,87 @@ func clean(cmd *cobra.Command, args []string) {
 	for k := range xmpsToDelete {
 		fmt.Println("Delete xmp", k)
 	}
+	if len(xmpsToDelete) > 0 || len(rawsToDelete) > 0 {
 
-	// if "move" selected at prompt, stage files for deletion in a folder. keep a log so it can be undone
+		doStage := YesNoPrompt("Stage files listed above for deletion?", false)
 
-	// if "yes" selected, or confirm after move, delete all enumerated raw and xmp files
+		if doStage {
+			fmt.Println("Staging raws")
+			for k := range rawsToDelete {
+				raw := rawsToDelete[k]
+				fmt.Println("Staging", raw)
+				err := raw.StageForDeletion(viper.GetBool("dry-run"))
+				if err != nil {
+					log.Fatalf("Error staging %s for deletion: %v", raw.GetPath(), err)
+				}
+			}
+			fmt.Println("Staging xmps")
+			for k := range xmpsToDelete {
+				xmp := xmpsToDelete[k]
+				fmt.Println("Staging", xmp)
+				err := xmp.StageForDeletion(viper.GetBool("dry-run"))
+				fmt.Println("xmp after staging", xmp, ":", xmp.GetPath())
+				if err != nil {
+					log.Fatalf("Error staging %s for deletion: %v", xmp.GetPath(), err)
+				}
+			}
+		}
+
+		// if "move" selected at prompt, stage files for deletion in a folder. keep a log so it can be undone
+
+		// if "yes" selected, or confirm after move, delete all enumerated raw and xmp files
+		doDelete := YesNoPrompt("Delete the source files listed above?", false)
+		if doDelete {
+			fmt.Println("Deleting raws")
+			for k := range rawsToDelete {
+				raw := rawsToDelete[k]
+				fmt.Println("Deleting", raw)
+				err := raw.Delete(viper.GetBool("dry-run"))
+				if err != nil {
+					log.Fatalf("Error deleting %s: %v", raw.GetPath(), err)
+				}
+			}
+			fmt.Println("Deleting xmps")
+			for k := range xmpsToDelete {
+				xmp := xmpsToDelete[k]
+				fmt.Println("Deleting", xmp)
+				err := xmp.Delete(viper.GetBool("dry-run"))
+				if err != nil {
+					log.Fatalf("Error deleting %s: %v", xmp.GetPath(), err)
+				}
+			}
+		}
+		fmt.Println("doDelete:", doDelete)
+	} else {
+		fmt.Println("No candidate source files to delete")
+	}
+}
+
+// YesNoPrompt asks yes/no questions using the label.
+func YesNoPrompt(label string, defaultChoice bool) bool {
+	choices := "Y/n"
+	if !defaultChoice {
+		choices = "y/N"
+	}
+
+	r := bufio.NewReader(os.Stdin)
+	var s string
+
+	for {
+		fmt.Fprintf(os.Stderr, "%s (%s) ", label, choices)
+		s, _ = r.ReadString('\n')
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return defaultChoice
+		}
+		s = strings.ToLower(s)
+		if s == "y" || s == "yes" {
+			return true
+		}
+		if s == "n" || s == "no" {
+			return false
+		}
+	}
 }
 
 func init() {

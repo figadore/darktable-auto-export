@@ -85,7 +85,7 @@ func (raw *Raw) AddXmp(xmp *Xmp) {
 	// If there's already a matching jpg for this raw, link it to the xmp
 	if xmp.Jpg == nil && len(raw.Jpgs) > 0 {
 		for k := range raw.Jpgs {
-			if jpgMatchesXmp(*raw.Jpgs[k], *xmp) {
+			if jpgMatchesXmp(raw.Jpgs[k], xmp) {
 				xmp.LinkJpg(raw.Jpgs[k])
 			}
 		}
@@ -106,7 +106,7 @@ func (raw *Raw) AddJpg(jpg *Jpg) {
 	// If there's already a matching xmp for this raw, link it to the jpg
 	if jpg.Xmp == nil && len(raw.Xmps) > 0 {
 		for k := range raw.Xmps {
-			if jpgMatchesXmp(*jpg, *raw.Xmps[k]) {
+			if jpgMatchesXmp(jpg, raw.Xmps[k]) {
 				jpg.LinkXmp(raw.Xmps[k])
 			}
 		}
@@ -115,6 +115,39 @@ func (raw *Raw) AddJpg(jpg *Jpg) {
 
 func (raw *Raw) GetRawExt() string {
 	return filepath.Ext(raw.GetPath())
+}
+
+func (raw *Raw) StageForDeletion(dryRun bool) error {
+	newPath := filepath.Join(raw.srcDir, "delete", raw.Path.GetRelativeDir(), filepath.Base(raw.GetPath()))
+	if dryRun {
+		fmt.Println("Move", raw.GetPath(), "to", newPath)
+		return nil
+	}
+	err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = os.Rename(raw.GetPath(), newPath)
+	raw.Path.fullPath = newPath
+	return err
+}
+
+func (raw *Raw) Delete(dryRun bool) error {
+	if dryRun {
+		fmt.Println("Delete", raw.GetPath())
+		return nil
+	}
+	err := os.Remove(raw.GetPath())
+	if err != nil {
+		return err
+	}
+	for _, xmp := range raw.Xmps {
+		xmp.Raw = nil
+	}
+	for _, jpg := range raw.Jpgs {
+		jpg.Raw = nil
+	}
+	return nil
 }
 
 type Xmp struct {
@@ -190,6 +223,42 @@ func (xmp *Xmp) GetBasename() string {
 	return basename
 }
 
+func (xmp *Xmp) StageForDeletion(dryRun bool) error {
+	newPath := filepath.Join(xmp.Path.GetBaseDir(), "delete", xmp.Path.GetRelativeDir(), filepath.Base(xmp.GetPath()))
+	if dryRun {
+		fmt.Println("Move", xmp.GetPath(), "to", newPath)
+		return nil
+	}
+	err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm)
+	if err != nil {
+		return err
+	}
+	err = os.Rename(xmp.GetPath(), newPath)
+	xmp.Path.fullPath = newPath
+	return err
+}
+
+func (xmp *Xmp) Delete(dryRun bool) error {
+	if dryRun {
+		fmt.Println("Delete", xmp.GetPath())
+		return nil
+	}
+	err := os.Remove(xmp.GetPath())
+	if err != nil {
+		return err
+	}
+	if xmp.Jpg != nil {
+		xmp.Jpg.Xmp = nil
+	}
+	if xmp.Raw != nil {
+		raw := xmp.Raw
+		if _, ok := raw.Xmps[xmp.GetPath()]; !ok {
+			raw.Xmps[xmp.GetPath()] = nil
+		}
+	}
+	return nil
+}
+
 type Jpg struct {
 	Path ImagePath
 	Raw  *Raw
@@ -261,8 +330,8 @@ func (jpg Jpg) String() string {
 
 // List all raws, xmps, and jpgs found in the sources and exports dir
 // Each returned object includes any linked objects that were detected
-func FindImages(sourcesDir, exportsDir string, extensions []string) ([]Raw, []Xmp, []Jpg) {
-	var raws []Raw
+func FindImages(sourcesDir, exportsDir string, extensions []string) ([]*Raw, []*Xmp, []*Jpg) {
+	var raws []*Raw
 	var rawPaths []string
 	// Find all files with any of the given extensions
 	for _, ext := range extensions {
@@ -273,20 +342,20 @@ func FindImages(sourcesDir, exportsDir string, extensions []string) ([]Raw, []Xm
 	// Create a new Raw object for each found path
 	for _, rawPath := range rawPaths {
 		raw := NewRaw(ImagePath{fullPath: rawPath, basePath: sourcesDir})
-		raws = append(raws, *raw)
+		raws = append(raws, raw)
 	}
-	var xmps []Xmp
+	var xmps []*Xmp
 	for _, xmpPath := range xmpPaths {
 		xmp := NewXmp(ImagePath{fullPath: xmpPath, basePath: sourcesDir})
-		xmps = append(xmps, *xmp)
+		xmps = append(xmps, xmp)
 		//jpg := NewJpg(jpgPath)
 		//xmp.AddJpg(jpg)
 		//raws[0].AddXmp(xmp)
 	}
-	var jpgs []Jpg
+	var jpgs []*Jpg
 	for _, jpgPath := range jpgPaths {
 		jpg := NewJpg(ImagePath{fullPath: jpgPath, basePath: exportsDir})
-		jpgs = append(jpgs, *jpg)
+		jpgs = append(jpgs, jpg)
 	}
 	linkImages(raws, xmps, jpgs)
 	//for _, jpg := range jpgs {
@@ -298,30 +367,30 @@ func FindImages(sourcesDir, exportsDir string, extensions []string) ([]Raw, []Xm
 // For each raw, find corresponding xmps and jpgs
 // For each xmp, find corresponding jpgs and raws (redundant?)
 // For each jpg, find corresponding xmps (redundant?) and raws (redundant?)
-func linkImages(raws []Raw, xmps []Xmp, jpgs []Jpg) {
+func linkImages(raws []*Raw, xmps []*Xmp, jpgs []*Jpg) {
 	for i, raw := range raws {
 		for j, xmp := range xmps {
 			if xmpMatchesRaw(xmp, raw) {
-				raws[i].AddXmp(&xmps[j])
+				raws[i].AddXmp(xmps[j])
 			}
 		}
 		for j, jpg := range jpgs {
 			if jpgMatchesRaw(jpg, raw) {
-				raws[i].AddJpg(&jpgs[j])
+				raws[i].AddJpg(jpgs[j])
 			}
 		}
 	}
 	for i, xmp := range xmps {
 		for j, jpg := range jpgs {
 			if jpgMatchesXmp(jpg, xmp) {
-				xmps[i].LinkJpg(&jpgs[j])
+				xmps[i].LinkJpg(jpgs[j])
 			}
 		}
 	}
 	for i, jpg := range jpgs {
 		for j, raw := range raws {
 			if jpgMatchesRaw(jpg, raw) {
-				jpgs[i].LinkRaw(&raws[j])
+				jpgs[i].LinkRaw(raws[j])
 				//	fmt.Println("found raw for jpg", jpg, ":", raw)
 				//} else {
 				//	fmt.Println("\nr-", raw.GetPath(), "does not match jpg", jpg)
@@ -330,7 +399,7 @@ func linkImages(raws []Raw, xmps []Xmp, jpgs []Jpg) {
 	}
 }
 
-func jpgMatchesXmp(jpg Jpg, xmp Xmp) bool {
+func jpgMatchesXmp(jpg *Jpg, xmp *Xmp) bool {
 	jpgRelativePath := jpg.Path.GetRelativePath()
 	base := xmp.Path.GetBasename()
 	relativeDir := xmp.Path.GetRelativeDir()
@@ -341,7 +410,7 @@ func jpgMatchesXmp(jpg Jpg, xmp Xmp) bool {
 	return false
 }
 
-func xmpMatchesRaw(xmp Xmp, raw Raw) bool {
+func xmpMatchesRaw(xmp *Xmp, raw *Raw) bool {
 	xmpPath := xmp.GetPath()
 	base := raw.Path.GetBasename()
 	ext := filepath.Ext(raw.GetPath())
@@ -369,7 +438,7 @@ func xmpMatchesRaw(xmp Xmp, raw Raw) bool {
 	return false
 }
 
-func jpgMatchesRaw(jpg Jpg, raw Raw) bool {
+func jpgMatchesRaw(jpg *Jpg, raw *Raw) bool {
 	jpgPath := jpg.Path.GetRelativePath()
 	base := raw.Path.GetBasename()
 	ext := filepath.Ext(raw.GetPath())
