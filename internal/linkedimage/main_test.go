@@ -491,7 +491,6 @@ func TestJpgMatchesRaw(t *testing.T) {
 		rawBaseDir string
 		want       bool
 	}{
-
 		{"/some/dst/dir/_DSC1234_01.jpg", "/some/dst", "/some/src/dir/_DSC1234_01.arw", "/some/src", true},
 		{"/some/dst/dir/_DSC1234_01.jpg", "/some/dst", "/some/src/dir/_DSC1234_01.ARW", "/some/src", true},
 		{"/some/dst/dir/_DSC1234_01.jpg", "/some/dst", "/some/src/dir/_DSC1234_01", "/some/src", true},
@@ -513,237 +512,20 @@ func TestJpgMatchesRaw(t *testing.T) {
 	}
 }
 
-// old
-//func TestRawFindXmps(t *testing.T) {
-//	want := []string{"test/src/_DSC1234.ARW.xmp", "test/src/_DSC1234_01.ARW.xmp"}
-//	raws := FindFilesWithExt("./test/src", ".arw")
-//	xmps := FindXmps(raws[0])
-//	if !reflect.DeepEqual(want, xmps) {
-//		t.Fatalf(`Wanted %s, got %s`, want, xmps)
+//func TestFindImages(t *testing.T) {
+//	raws := FindImages("test/src", "test/dst", []string{".ARW", ".dng"})
+//	// Print all raws
+//	for _, raw := range raws {
+//		fmt.Println(raw)
+//		fmt.Println("xmps")
+//		for _, xmp := range raw.Xmps {
+//			fmt.Println("xmp:", xmp)
+//			fmt.Println("jpg:", xmp.Jpg)
+//		}
+//		fmt.Println("jpgs")
+//		for _, jpg := range raw.Jpgs {
+//			fmt.Println("jpg:", jpg)
+//			fmt.Println("xmp:", jpg.Xmp)
+//		}
 //	}
 //}
-//
-////func TestGetRelativeDir(t *testing.T) {
-////	var tests = []struct {
-////		fullPath  string
-////		inputPath string
-////		want      string
-////	}{
-////		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW.xmp", "."},
-////		{"./test/src/_DSC1234.ARW", "./test/dst/_DSC4321.jpg", "../src"},
-////		{"./the/path/filename.txt", ".", "the/path"},
-////		{"/mnt/path/filename.txt", "/mnt", "path"},
-////	}
-////
-////	for _, tt := range tests {
-////		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.inputPath)
-////		t.Run(testname, func(t *testing.T) {
-////			relativeDir := GetRelativeDir(tt.fullPath, tt.inputPath)
-////			if relativeDir != tt.want {
-////				t.Errorf("got %s, want %s", relativeDir, tt.want)
-////			}
-////		})
-////	}
-////}
-//
-//func TestStripCommonDir(t *testing.T) {
-//	var tests = []struct {
-//		fullPath  string
-//		inputPath string
-//		want      string
-//	}{
-//		{"./test/src/_DSC1234.ARW", "./test/src/_DSC1234.ARW", "_DSC1234.ARW"},
-//		{"./test/src/_DSC1234.ARW", "./test/src/", "_DSC1234.ARW"},
-//		{"./test/dst/_DSC1234.jpg", "./test/dst/", "_DSC1234.jpg"},
-//		//{"./test/src/_DSC1234.ARW", "./test/dst/", "src/_DSC1234.ARW"},
-//		//{"./test/src/_DSC1234.ARW", "./test/dst/_DSC4321.jpg", "src/_DSC1234.ARW"},
-//		{"./test/src/_DSC1234.ARW", "./test/", "src/_DSC1234.ARW"},
-//	}
-//
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s:%s", tt.fullPath, tt.inputPath)
-//		t.Run(testname, func(t *testing.T) {
-//			stripped := StripSharedDir(tt.fullPath, tt.inputPath)
-//			if stripped != tt.want {
-//				t.Errorf("got %s, want %s", stripped, tt.want)
-//			}
-//		})
-//	}
-//}
-//
-//func TestGetJpgFilename(t *testing.T) {
-//}
-//
-//func TestGetRawFilenameForJpg(t *testing.T) {
-//	var tests = []struct {
-//		jpgPath string
-//		want    string
-//	}{
-//		{"tests/dst/_DSC1234.jpg", "_DSC1234.ARW"},
-//		{"tests/dst/_DSC1234_123_01.jpg", "_DSC1234_123.ARW"},
-//		{"tests/dst/_DSC1234_01.jpg", "_DSC1234.ARW"},
-//	}
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s", tt.jpgPath)
-//		t.Run(testname, func(t *testing.T) {
-//			rawPath := GetRawFilenameForJpg(tt.jpgPath, ".ARW")
-//			if rawPath != tt.want {
-//				t.Errorf("got %s, want %s", rawPath, tt.want)
-//			}
-//		})
-//	}
-//}
-//
-//func TestGetXmpFilenameForJpg(t *testing.T) {
-//	var tests = []struct {
-//		jpgPath         string
-//		want            string
-//		wantVirtualCopy bool
-//	}{
-//		{"tests/dst/_DSC1234.jpg", "_DSC1234.ARW.xmp", false},
-//		{"tests/dst/_DSC1234_123_01.jpg", "_DSC1234_123_01.ARW.xmp", true},
-//		{"tests/dst/_DSC1234_123.jpg", "_DSC1234_123.ARW.xmp", false},
-//		{"tests/dst/_DSC1234_01.jpg", "_DSC1234_01.ARW.xmp", true},
-//	}
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s", tt.jpgPath)
-//		t.Run(testname, func(t *testing.T) {
-//			rawPath, isVirtualCopy := GetXmpFilenameForJpg(tt.jpgPath, ".ARW")
-//			if rawPath != tt.want {
-//				t.Errorf("got %s, want %s", rawPath, tt.want)
-//			}
-//			if isVirtualCopy != tt.wantVirtualCopy {
-//				t.Errorf("for virtual copy check, got %v, want %v", isVirtualCopy, tt.wantVirtualCopy)
-//			}
-//		})
-//	}
-//}
-//
-//func TestFindJpgsWithoutRaw(t *testing.T) {
-//	var tests = []struct {
-//		rawExt []string
-//		want   []string
-//	}{
-//		{[]string{".arw"}, []string{"test/dst/_DSC4321.jpg"}},
-//		{[]string{".ARW"}, []string{"test/dst/_DSC4321.jpg"}},
-//		{[]string{".ARW", ".dng"}, []string{"test/dst/_DSC4321.jpg"}},
-//	}
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s", tt.rawExt)
-//		t.Run(testname, func(t *testing.T) {
-//			jpgs := FindFilesWithExt("./test/dst", ".jpg")
-//			raws := FindFilesWithExt("./test/src", ".ARW")
-//
-//			//fmt.Println("jpgs:", jpgs, "raws:", raws)
-//			jpgsToDelete := FindJpgsWithoutRaw(jpgs, raws, "test/src", "test/dst", tt.rawExt)
-//			if !reflect.DeepEqual(tt.want, jpgsToDelete) {
-//				t.Errorf(`Wanted %s, got %s`, tt.want, jpgsToDelete)
-//			}
-//		})
-//	}
-//}
-//
-//func TestFindJpgsWithoutXmp(t *testing.T) {
-//	var tests = []struct {
-//		rawExt []string
-//		want   []string
-//	}{
-//		{[]string{".arw"}, []string{"test/dst/_DSC1234_02.jpg"}},
-//		{[]string{".ARW"}, []string{"test/dst/_DSC1234_02.jpg"}},
-//		{[]string{".ARW", ".dng"}, []string{"test/dst/_DSC1234_02.jpg"}},
-//	}
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s", tt.rawExt)
-//		t.Run(testname, func(t *testing.T) {
-//			jpgs := FindFilesWithExt("./test/dst", ".jpg")
-//			xmps := FindFilesWithExt("./test/src", ".xmp")
-//			//raws := FindFilesWithExt("./test/src", ".ARW")
-//			jpgsToDelete := FindJpgsWithoutXmp(jpgs, xmps, "test/src", "test/dst", tt.rawExt)
-//			if !reflect.DeepEqual(tt.want, jpgsToDelete) {
-//				t.Errorf(`Wanted %s, got %s`, tt.want, jpgsToDelete)
-//			}
-//		})
-//	}
-//}
-//
-//func TestGetRawPathForXmp(t *testing.T) {
-//	var tests = []struct {
-//		xmpPath string
-//		want    string
-//	}{
-//
-//		{"/some/dir/_DSC1234_01.arw.xmp", "/some/dir/_DSC1234.ARW"},
-//		{"/some/dir/_DSC1234_01.xmp", "/some/dir/_DSC1234.ARW"},
-//		{"/some/dir/_DSC1234_01.ARW.xmp", "/some/dir/_DSC1234.ARW"},
-//	}
-//	for _, tt := range tests {
-//		testname := fmt.Sprintf("%s", tt.xmpPath)
-//		t.Run(testname, func(t *testing.T) {
-//			rawPath := getRawPathForXmp(tt.xmpPath, ".ARW")
-//			if !reflect.DeepEqual(tt.want, rawPath) {
-//				t.Errorf(`Wanted %s, got %s`, tt.want, rawPath)
-//			}
-//		})
-//	}
-//}
-//
-////func TestFindImages(t *testing.T) {
-////	raws := FindImages("test/src", "test/dst", []string{".ARW", ".dng"})
-////	// Print all raws
-////	for _, raw := range raws {
-////		fmt.Println(raw)
-////		fmt.Println("xmps")
-////		for _, xmp := range raw.Xmps {
-////			fmt.Println("xmp:", xmp)
-////			fmt.Println("jpg:", xmp.Jpg)
-////		}
-////		fmt.Println("jpgs")
-////		for _, jpg := range raw.Jpgs {
-////			fmt.Println("jpg:", jpg)
-////			fmt.Println("xmp:", jpg.Xmp)
-////		}
-////	}
-////}
-//
-//// No longer used, keeping in case needed in the future
-////func TestXmpGetJpgPath(t *testing.T) {
-////	var tests = []struct {
-////		xmpPath    string
-////		xmpBaseDir string
-////		jpgBaseDir string
-////		want       string
-////	}{
-////
-////		{"/some/src/dir/_DSC1234_01.arw.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234_01.jpg"},
-////		{"/some/src/dir/_DSC1234_01.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234_01.jpg"},
-////		{"/some/src/dir/_DSC1234_01.ARW.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234_01.jpg"},
-////		{"/some/src/dir/_DSC1234.dng.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234.jpg"},
-////	}
-////	for _, tt := range tests {
-////		xmp := NewXmp(ImagePath{fullPath: tt.xmpPath, basePath: tt.xmpBaseDir})
-////		jpgPath := xmp.GetJpgPath(tt.jpgBaseDir)
-////		if jpgPath != tt.want {
-////			t.Errorf(`Wanted %v, got %v`, tt.want, jpgPath)
-////		}
-////	}
-////}
-////
-////func TestJpgGetXmpPath(t *testing.T) {
-////	var tests = []struct {
-////		want       string
-////		xmpBaseDir string
-////		jpgBaseDir string
-////		jpgPath    string
-////	}{
-////
-////		{"/some/src/dir/_DSC1234_01.ARW.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234_01.jpg"},
-////		{"/some/src/dir/_DSC1234.ARW.xmp", "/some/src", "/some/dst", "/some/dst/dir/_DSC1234.jpg"},
-////	}
-////	for _, tt := range tests {
-////		jpg := NewJpg(ImagePath{fullPath: tt.jpgPath, basePath: tt.jpgBaseDir})
-////		xmpPath := jpg.GetXmpPath(tt.xmpBaseDir, ".ARW")
-////		if xmpPath != tt.want {
-////			t.Errorf(`Wanted %v, got %v`, tt.want, xmpPath)
-////		}
-////	}
-////}

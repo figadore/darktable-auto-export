@@ -31,19 +31,19 @@ func clean(cmd *cobra.Command, args []string) {
 
 	// Trace
 	// Print all raws
-	for _, raw := range raws {
-		fmt.Println(raw)
-		//fmt.Println("xmps")
-		//for _, xmp := range raw.Xmps {
-		//	fmt.Println("xmp:", xmp)
-		//	fmt.Println("jpg:", xmp.Jpg)
-		//}
-		//fmt.Println("jpgs")
-		//for _, jpg := range raw.Jpgs {
-		//	fmt.Println("jpg:", jpg)
-		//	fmt.Println("xmp:", jpg.Xmp)
-		//}
-	}
+	//for _, raw := range raws {
+	//    fmt.Println(raw)
+	//    //fmt.Println("xmps")
+	//    //for _, xmp := range raw.Xmps {
+	//    //	fmt.Println("xmp:", xmp)
+	//    //	fmt.Println("jpg:", xmp.Jpg)
+	//    //}
+	//    //fmt.Println("jpgs")
+	//    //for _, jpg := range raw.Jpgs {
+	//    //	fmt.Println("jpg:", jpg)
+	//    //	fmt.Println("xmp:", jpg.Xmp)
+	//    //}
+	//}
 
 	rawsToDelete := make(map[string]*linkedimage.Raw)
 	xmpsToDelete := make(map[string]*linkedimage.Xmp)

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 type ExportParams struct {
@@ -14,9 +13,8 @@ type ExportParams struct {
 	RawPath    string // Full path to raw file
 	XmpPath    string // Full path to xmp (optional)
 	OutputPath string // Full path to target jpg
-	//OutputDir string //Base directory where jpgs go. Intermediate property
-	OnlyNew bool // Only export if target doesn't exist, no replace
-	DryRun  bool // Show actions that would be performed, but don't do them
+	OnlyNew    bool   // Only export if target doesn't exist, no replace
+	DryRun     bool   // Show actions that would be performed, but don't do them
 }
 
 func Export(params ExportParams) error {
@@ -35,11 +33,8 @@ func Export(params ExportParams) error {
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
 	}
-	//args = append(args, params.OutputPath)
 	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
 	args = append(args, tmpPath)
-	// Uncomment this line to do a dry run (maybe turn this into a param, but be sure to include dry run deleting files)
-	//args = append([]string{"echo"}, args...)
 	err := runCmd(args, params.DryRun, true)
 	if err != nil {
 		return err
@@ -47,7 +42,6 @@ func Export(params ExportParams) error {
 	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
 	// Synology albums lost track of replaced images whenever I used a method
 	// other than these commands
-	//fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
 	runCmd(args, params.DryRun, false)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
@@ -82,18 +76,4 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 		return err
 	}
 	return nil
-}
-
-func GetModifiedDate(src string) (time.Time, error) {
-	if info, err := os.Stat(src); err == nil {
-		fmt.Printf("Found existing file at target path. copying modified date %s\n", src)
-		t := info.ModTime()
-		return t, nil
-	} else if errors.Is(err, os.ErrNotExist) {
-		// file doesn't exist, nothing to delete
-		fmt.Printf("Did not find existing file at target path. Can't copy modified date %s\n", src)
-		return time.Now(), nil
-	} else {
-		return time.Now(), err
-	}
 }
