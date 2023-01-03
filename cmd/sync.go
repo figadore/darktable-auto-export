@@ -3,13 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/figadore/darktable-auto-export/internal/darktable"
-	"github.com/figadore/darktable-auto-export/internal/sidecars"
+	"github.com/figadore/darktable-auto-export/internal/linkedimage"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -41,6 +39,7 @@ func init() {
 	syncCmd.Flags().StringP("command", "c", "flatpak run --command=darktable-cli org.darktable.Darktable", "Darktable command or binary")
 	syncCmd.Flags().StringSliceP("extension", "e", []string{".ARW"}, "Extension of raw files")
 	syncCmd.Flags().BoolP("new", "n", false, "Only export when target jpg does not exist")
+	syncCmd.Flags().Bool("dry-run", false, "Show actions that would be performed, but don't do them")
 	syncCmd.Flags().BoolP("delete-missing", "d", false, `Delete jpgs where corresponding raw files are missing. This is useful for darktable workflows where editing and culling can be done at any time, not just up front. *warning* This will delete all jpgs in the output directory where a corresponding raw file with the specified extension cannot be found! Only use this for directories that are exclusively for this workflow, and where the source files stay where they are/were.
 `)
 
@@ -61,7 +60,7 @@ func init() {
 
 func sync(cmd *cobra.Command, args []string) error {
 	// Check whether input arg is a directory or a xmp file
-	isDir, err := sidecars.IsDir(viper.GetString("in"))
+	isDir, err := linkedimage.IsDir(viper.GetString("in"))
 	if err != nil {
 		return err
 	}
@@ -75,14 +74,18 @@ func sync(cmd *cobra.Command, args []string) error {
 }
 
 func syncDir() error {
-	// Recurse through input directory looking for finding raw files
-	var raws []string
-	// For each defined extension, add to the list of raws
-	for _, ext := range viper.GetStringSlice("extension") {
-		raws = append(raws, sidecars.FindFilesWithExt(viper.GetString("in"), ext)...)
-	}
+	inDir := viper.GetString("in")
+	outDir := viper.GetString("out")
+	extensions := viper.GetStringSlice("extension")
+	raws, _, jpgs := linkedimage.FindImages(inDir, outDir, extensions)
 	for _, raw := range raws {
-		err := syncRaw(raw)
+		params := darktable.ExportParams{
+			Command: viper.GetString("command"),
+			RawPath: raw.GetPath(),
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
+		}
+		err := raw.Sync(params, viper.GetString("out"))
 		if err != nil {
 			return err
 		}
@@ -90,11 +93,20 @@ func syncDir() error {
 	// Delete jpgs with missing raws and xmps
 	if viper.GetBool("delete-missing") {
 		fmt.Println("Deleting jpgs for missing raws")
-		jpgs := sidecars.FindFilesWithExt(viper.GetString("out"), ".jpg")
-		jpgsToDelete := sidecars.FindJpgsWithoutRaw(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))
-		jpgsToDelete = append(jpgsToDelete, sidecars.FindJpgsWithoutXmp(jpgs, viper.GetString("in"), viper.GetString("out"), viper.GetStringSlice("extension"))...)
-		deleteJpgs(jpgsToDelete)
-		fmt.Printf("Deleting %v of %v jpgs", len(jpgsToDelete), len(jpgs))
+		// Use a map to avoid duplicates
+		jpgsToDelete := make(map[string]*linkedimage.Jpg)
+		for _, jpg := range jpgs {
+			if jpg.Raw == nil {
+				jpgsToDelete[jpg.GetPath()] = jpg
+			}
+			if jpg.Xmp == nil && jpg.IsVirtualCopy() {
+				jpgsToDelete[jpg.GetPath()] = jpg
+			}
+		}
+		fmt.Printf("Deleting %v of %v jpgs\n", len(jpgsToDelete), len(jpgs))
+		for _, v := range jpgsToDelete {
+			v.Delete(viper.GetBool("dry-run"))
+		}
 	} else {
 		fmt.Printf("Not deleting jpgs for missing raws")
 	}
@@ -106,70 +118,42 @@ func syncDir() error {
 	return nil
 }
 
-func syncRaw(raw string) error {
-	fmt.Println("Syncing raw", raw)
-	// Find adjacent xmp files
-	xmps := sidecars.FindXmps(raw)
-	basename := strings.TrimSuffix(filepath.Base(raw), filepath.Ext(raw))
-	relativeDir := sidecars.GetRelativeDir(raw, viper.GetString("in"))
-	outputPath := filepath.Join(viper.GetString("out"), relativeDir, fmt.Sprintf("%s.jpg", basename))
-	params := darktable.ExportParams{
-		Command:    viper.GetString("command"),
-		RawPath:    raw,
-		OutputPath: outputPath,
-		OnlyNew:    viper.GetBool("new"),
-	}
-	if len(xmps) == 0 {
-		fmt.Println("No xmp files found, applying default settings")
-		err := darktable.Export(params)
-		if err != nil {
-			return err
-		}
-	} else {
-		for _, xmp := range xmps {
-			fmt.Println("Sync xmp file", xmp)
-			err := syncFile(xmp)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // syncFile takes the path to a raw file or xmp and exports jpgs
 func syncFile(path string) error {
+	inDir := viper.GetString("in")
+	outDir := viper.GetString("out")
+	extensions := viper.GetStringSlice("extension")
 	//switch ext := filepath.Ext(viper.GetString("in")); {
 	switch ext := filepath.Ext(path); {
 	case ext == ".xmp":
-		xmp := path
-		fmt.Println("Syncing xmp")
-		foundRaw, err := sidecars.FindRawPathForXmp(xmp, viper.GetStringSlice("extension"))
+		xmp, err := linkedimage.FindXmp(path, inDir, outDir, extensions)
 		if err != nil {
 			return err
 		}
-		relativeDir := sidecars.GetRelativeDir(xmp, viper.GetString("in"))
-		// Export the RAW file
-		jpgFilename := sidecars.GetJpgFilename(xmp, viper.GetStringSlice("extension"))
-		outputPath, err := filepath.Abs(filepath.Join(viper.GetString("out"), relativeDir, jpgFilename))
-		if err != nil {
-			log.Fatalf("Error getting jpg path: %v", err)
-		}
 		params := darktable.ExportParams{
-			Command:    viper.GetString("command"),
-			RawPath:    foundRaw,
-			OnlyNew:    viper.GetBool("new"),
-			OutputPath: outputPath,
-			XmpPath:    xmp,
+			Command: viper.GetString("command"),
+			XmpPath: path,
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
 		}
-		err = darktable.Export(params)
+		err = xmp.Sync(params, viper.GetString("out"))
 		if err != nil {
 			return err
 		}
 	// raw
 	case caseInsensitiveContains(viper.GetStringSlice("extension"), ext):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
-		err := syncRaw(path)
+		raw, err := linkedimage.FindRaw(path, inDir, outDir)
+		if err != nil {
+			return err
+		}
+		params := darktable.ExportParams{
+			Command: viper.GetString("command"),
+			RawPath: path,
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
+		}
+		err = raw.Sync(params, viper.GetString("out"))
 		if err != nil {
 			return err
 		}
@@ -180,20 +164,13 @@ func syncFile(path string) error {
 }
 
 func caseInsensitiveContains(haystack []string, needle string) bool {
+	fmt.Println("Checking", haystack, "for", needle)
 	for _, v := range haystack {
 		if strings.EqualFold(needle, v) {
+			fmt.Println("found")
 			return true
 		}
 	}
+	fmt.Println("not found")
 	return false
-}
-
-func deleteJpgs(jpgs []string) {
-	for _, jpgPath := range jpgs {
-		err := os.Remove(jpgPath)
-		if err != nil {
-			log.Fatalf("Error deleting jpg: %v", err)
-			return
-		}
-	}
 }

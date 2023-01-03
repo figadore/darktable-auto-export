@@ -6,15 +6,15 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 type ExportParams struct {
-	Command    string
-	RawPath    string
-	XmpPath    string
-	OutputPath string
-	OnlyNew    bool
+	Command    string // Darktable binary
+	RawPath    string // Full path to raw file
+	XmpPath    string // Full path to xmp (optional)
+	OutputPath string // Full path to target jpg
+	OnlyNew    bool   // Only export if target doesn't exist, no replace
+	DryRun     bool   // Show actions that would be performed, but don't do them
 }
 
 func Export(params ExportParams) error {
@@ -33,35 +33,42 @@ func Export(params ExportParams) error {
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
 	}
-	//args = append(args, params.OutputPath)
 	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
 	args = append(args, tmpPath)
-	// Uncomment this line to do a dry run (maybe turn this into a param, but be sure to include dry run deleting files)
-	//args = append([]string{"echo"}, args...)
-	err := runCmd(args)
+	err := runCmd(args, params.DryRun, true)
 	if err != nil {
 		return err
 	}
 	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
 	// Synology albums lost track of replaced images whenever I used a method
 	// other than these commands
-	//fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
-	runCmd(args)
+	runCmd(args, params.DryRun, false)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
-	runCmd(args)
+	runCmd(args, params.DryRun, false)
 	args = []string{"rm", tmpPath}
-	runCmd(args)
+	runCmd(args, params.DryRun, false)
 	return nil
 }
 
-func runCmd(args []string) error {
+func runCmd(args []string, dryRun bool, prints bool) error {
 	remaining := args[1:]
-	fmt.Println(args)
-	cmd := exec.Command(args[0], remaining...)
+	if prints {
+		fmt.Println(args)
+	}
+	var cmd *exec.Cmd
+	if dryRun {
+		cmd = exec.Command("echo", args...)
+	} else {
+		cmd = exec.Command(args[0], remaining...)
+	}
 	stdout, err := cmd.CombinedOutput()
 	if len(stdout) != 0 {
-		fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+		if !dryRun {
+			fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+		} else if prints {
+			fmt.Print(string(stdout))
+		}
 	}
 	if err != nil {
 		fmt.Println("cmd error", err.Error())
@@ -69,18 +76,4 @@ func runCmd(args []string) error {
 		return err
 	}
 	return nil
-}
-
-func GetModifiedDate(src string) (time.Time, error) {
-	if info, err := os.Stat(src); err == nil {
-		fmt.Printf("Found existing file at target path. copying modified date %s\n", src)
-		t := info.ModTime()
-		return t, nil
-	} else if errors.Is(err, os.ErrNotExist) {
-		// file doesn't exist, nothing to delete
-		fmt.Printf("Did not find existing file at target path. Can't copy modified date %s\n", src)
-		return time.Now(), nil
-	} else {
-		return time.Now(), err
-	}
 }
