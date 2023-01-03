@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/figadore/darktable-auto-export/internal/darktable"
 	"github.com/figadore/darktable-auto-export/internal/linkedimage"
 
 	"github.com/spf13/cobra"
@@ -78,7 +79,13 @@ func syncDir() error {
 	extensions := viper.GetStringSlice("extension")
 	raws, _, jpgs := linkedimage.FindImages(inDir, outDir, extensions)
 	for _, raw := range raws {
-		err := raw.Sync(viper.GetBool("dry-run"))
+		params := darktable.ExportParams{
+			Command: viper.GetString("command"),
+			RawPath: raw.GetPath(),
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
+		}
+		err := raw.Sync(params, viper.GetString("out"))
 		if err != nil {
 			return err
 		}
@@ -96,10 +103,10 @@ func syncDir() error {
 				jpgsToDelete[jpg.GetPath()] = jpg
 			}
 		}
+		fmt.Printf("Deleting %v of %v jpgs\n", len(jpgsToDelete), len(jpgs))
 		for _, v := range jpgsToDelete {
 			v.Delete(viper.GetBool("dry-run"))
 		}
-		fmt.Printf("Deleting %v of %v jpgs", len(jpgsToDelete), len(jpgs))
 	} else {
 		fmt.Printf("Not deleting jpgs for missing raws")
 	}
@@ -123,7 +130,16 @@ func syncFile(path string) error {
 		if err != nil {
 			return err
 		}
-		xmp.Sync(viper.GetBool("dry-run"))
+		params := darktable.ExportParams{
+			Command: viper.GetString("command"),
+			XmpPath: path,
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
+		}
+		err = xmp.Sync(params, viper.GetString("out"))
+		if err != nil {
+			return err
+		}
 	// raw
 	case caseInsensitiveContains(viper.GetStringSlice("extension"), ext):
 		fmt.Println("Syncing raw file with extension", ext, ":", path)
@@ -131,7 +147,13 @@ func syncFile(path string) error {
 		if err != nil {
 			return err
 		}
-		err = raw.Sync(viper.GetBool("dry-run"))
+		params := darktable.ExportParams{
+			Command: viper.GetString("command"),
+			RawPath: path,
+			OnlyNew: viper.GetBool("new"),
+			DryRun:  viper.GetBool("dry-run"),
+		}
+		err = raw.Sync(params, viper.GetString("out"))
 		if err != nil {
 			return err
 		}

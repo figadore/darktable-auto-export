@@ -10,12 +10,13 @@ import (
 )
 
 type ExportParams struct {
-	Command    string
-	RawPath    string
-	XmpPath    string
-	OutputPath string
-	OnlyNew    bool
-	DryRun     bool
+	Command    string // Darktable binary
+	RawPath    string // Full path to raw file
+	XmpPath    string // Full path to xmp (optional)
+	OutputPath string // Full path to target jpg
+	//OutputDir string //Base directory where jpgs go. Intermediate property
+	OnlyNew bool // Only export if target doesn't exist, no replace
+	DryRun  bool // Show actions that would be performed, but don't do them
 }
 
 func Export(params ExportParams) error {
@@ -39,7 +40,7 @@ func Export(params ExportParams) error {
 	args = append(args, tmpPath)
 	// Uncomment this line to do a dry run (maybe turn this into a param, but be sure to include dry run deleting files)
 	//args = append([]string{"echo"}, args...)
-	err := runCmd(args, params.DryRun)
+	err := runCmd(args, params.DryRun, true)
 	if err != nil {
 		return err
 	}
@@ -48,17 +49,19 @@ func Export(params ExportParams) error {
 	// other than these commands
 	//fmt.Println("Completed export to tmp file?", tmpPath)
 	args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
-	runCmd(args, params.DryRun)
+	runCmd(args, params.DryRun, false)
 	args = []string{"cp", "-p", tmpPath, params.OutputPath}
-	runCmd(args, params.DryRun)
+	runCmd(args, params.DryRun, false)
 	args = []string{"rm", tmpPath}
-	runCmd(args, params.DryRun)
+	runCmd(args, params.DryRun, false)
 	return nil
 }
 
-func runCmd(args []string, dryRun bool) error {
+func runCmd(args []string, dryRun bool, prints bool) error {
 	remaining := args[1:]
-	fmt.Println(args)
+	if prints {
+		fmt.Println(args)
+	}
 	var cmd *exec.Cmd
 	if dryRun {
 		cmd = exec.Command("echo", args...)
@@ -67,11 +70,10 @@ func runCmd(args []string, dryRun bool) error {
 	}
 	stdout, err := cmd.CombinedOutput()
 	if len(stdout) != 0 {
-		if dryRun {
-			//fmt.Print(string(stdout))
-		} else {
+		if !dryRun {
 			fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
-
+		} else if prints {
+			fmt.Print(string(stdout))
 		}
 	}
 	if err != nil {

@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/figadore/darktable-auto-export/internal/darktable"
 )
 
 type LinkedImage interface {
@@ -112,19 +114,36 @@ func (raw *Raw) AddJpg(jpg *Jpg) {
 	}
 }
 
+// GetJpgPath gets the jpg filename for a raw file
+func (raw *Raw) GetJpgPath(jpgDir string) string {
+	base := raw.Path.GetBasename()           //e.g. _DSC1234_01
+	relativeDir := raw.Path.GetRelativeDir() //e.g. src
+	jpgRelativePath := fmt.Sprintf("%s.jpg", filepath.Join(relativeDir, base))
+	return filepath.Join(jpgDir, jpgRelativePath)
+}
+
 func (raw *Raw) GetRawExt() string {
 	return filepath.Ext(raw.GetPath())
 }
 
 // Sync finds any related xmps and exports jpgs
 // Internally, it also links the jpgs to the xmps and raws
-func (raw *Raw) Sync(dryRun bool) error {
-	if dryRun {
-		fmt.Println("Sync", raw.GetPath())
-		return nil
+func (raw *Raw) Sync(exportParams darktable.ExportParams, dstDir string) error {
+	if len(raw.Xmps) > 0 {
+		for _, xmp := range raw.Xmps {
+			exportParams.XmpPath = xmp.GetPath()
+			err := xmp.Sync(exportParams, dstDir)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		exportParams.OutputPath = raw.GetJpgPath(dstDir)
+		err := darktable.Export(exportParams)
+		if err != nil {
+			return err
+		}
 	}
-	// Link jpg to raw and xmp
-	// TODO
 	return nil
 	//fmt.Println("Syncing raw", raw)
 	//// Find adjacent xmp files
@@ -174,8 +193,8 @@ func (raw *Raw) StageForDeletion(dryRun bool) error {
 }
 
 func (raw *Raw) Delete(dryRun bool) error {
+	fmt.Println("Delete", raw.GetPath())
 	if dryRun {
-		fmt.Println("Delete", raw.GetPath())
 		return nil
 	}
 	err := os.Remove(raw.GetPath())
@@ -243,6 +262,8 @@ func (xmp *Xmp) IsVirtualCopy() bool {
 	return vSeq != ""
 }
 
+// GetRawExt gets the extension of the linked raw file
+// Does not work for Adobe style xmps where raw extension is missing
 func (xmp *Xmp) GetRawExt() string {
 	if xmp.Raw != nil {
 		return xmp.Raw.GetRawExt()
@@ -267,13 +288,13 @@ func (xmp *Xmp) GetBasename() string {
 
 // Sync finds any relate raw and exports jpgs
 // Internally, it also links the jpgs to the xmp and raw
-func (xmp *Xmp) Sync(dryRun bool) error {
-	if dryRun {
-		fmt.Println("Sync", xmp.GetPath())
-		return nil
+func (xmp *Xmp) Sync(exportParams darktable.ExportParams, dstDir string) error {
+	exportParams.OutputPath = xmp.GetJpgPath(dstDir)
+	exportParams.RawPath = xmp.Raw.GetPath()
+	err := darktable.Export(exportParams)
+	if err != nil {
+		return err
 	}
-	// Link jpg to raw and xmp
-	// TODO
 	return nil
 	//xmp := path
 	//fmt.Println("Syncing xmp")
@@ -319,8 +340,8 @@ func (xmp *Xmp) StageForDeletion(dryRun bool) error {
 }
 
 func (xmp *Xmp) Delete(dryRun bool) error {
+	fmt.Println("Delete", xmp.GetPath())
 	if dryRun {
-		fmt.Println("Delete", xmp.GetPath())
 		return nil
 	}
 	err := os.Remove(xmp.GetPath())
@@ -426,8 +447,8 @@ func (jpg Jpg) String() string {
 }
 
 func (jpg *Jpg) Delete(dryRun bool) error {
+	fmt.Println("Delete", jpg.GetPath())
 	if dryRun {
-		fmt.Println("Delete", jpg.GetPath())
 		return nil
 	}
 	err := os.Remove(jpg.GetPath())
