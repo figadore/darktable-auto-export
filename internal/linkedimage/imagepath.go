@@ -1,7 +1,9 @@
 package linkedimage
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -90,4 +92,15 @@ func (i *ImagePath) GetRelativePath() string {
 	// trace
 	//fmt.Printf("trim '%s' off the front of '%s' => '%s'\n", baseDir, i.fullPath, relativePath)
 	return relativePath
+}
+
+func (i *ImagePath) Exists() bool {
+	if _, err := os.Stat(i.fullPath); err == nil {
+		return true
+	} else if os.IsNotExist(err) {
+		return false
+	} else {
+		fmt.Printf("Failed checking for raw existence: %v", err)
+		return false
+	}
 }
