@@ -286,6 +286,30 @@ func (xmp *Xmp) GetBasename() string {
 	return basename
 }
 
+// GetJpgPath gets the jpg filename for an xmp file
+// Assumes the only thing after the first "." is 'xmp' or '<raw-ext>.xmp'
+func (xmp *Xmp) GetJpgPath(jpgDir string) string {
+	base := xmp.Path.GetBasename()           //e.g. _DSC1234_01
+	relativeDir := xmp.Path.GetRelativeDir() //e.g. src
+	jpgRelativePath := fmt.Sprintf("%s.jpg", filepath.Join(relativeDir, base))
+	return filepath.Join(jpgDir, jpgRelativePath)
+}
+
+// _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg
+// _DSC1234_01.xmp -> _DSC1234_01.jpg
+//func (xmp *Xmp) GetJpgPath() string {
+//	al
+//	basename := strings.TrimSuffix(filepath.Base(xmp.GetPath()), filepath.Ext(xmp.GetPath()))
+//	jpgBasename := basename
+//	// remove optional extra extension suffix
+//	// allow _DSC1234.xmp format as well (used by adobe and others)
+//	for _, ext := range extensions {
+//		exp := regexp.MustCompile(fmt.Sprintf(`(?i)(.*)%s(.*)`, ext))
+//		jpgBasename = exp.ReplaceAllString(jpgBasename, "${1}${2}")
+//	}
+//	return fmt.Sprintf("%s.jpg", jpgBasename)
+//}
+
 // Sync finds any relate raw and exports jpgs
 // Internally, it also links the jpgs to the xmp and raw
 func (xmp *Xmp) Sync(exportParams darktable.ExportParams, dstDir string) error {
@@ -400,30 +424,6 @@ func (jpg *Jpg) IsVirtualCopy() bool {
 	vSeq := jpg.Path.GetVSequence()
 	return vSeq != ""
 }
-
-// GetJpgPath gets the jpg filename for an xmp file
-// Assumes the only thing after the first "." is 'xmp' or '<raw-ext>.xmp'
-func (xmp *Xmp) GetJpgPath(jpgDir string) string {
-	base := xmp.Path.GetBasename()           //e.g. _DSC1234_01
-	relativeDir := xmp.Path.GetRelativeDir() //e.g. src
-	jpgRelativePath := fmt.Sprintf("%s.jpg", filepath.Join(relativeDir, base))
-	return filepath.Join(jpgDir, jpgRelativePath)
-}
-
-// _DSC1234_01.ARW.xmp -> _DSC1234_01.jpg
-// _DSC1234_01.xmp -> _DSC1234_01.jpg
-//func (xmp *Xmp) GetJpgPath() string {
-//	al
-//	basename := strings.TrimSuffix(filepath.Base(xmp.GetPath()), filepath.Ext(xmp.GetPath()))
-//	jpgBasename := basename
-//	// remove optional extra extension suffix
-//	// allow _DSC1234.xmp format as well (used by adobe and others)
-//	for _, ext := range extensions {
-//		exp := regexp.MustCompile(fmt.Sprintf(`(?i)(.*)%s(.*)`, ext))
-//		jpgBasename = exp.ReplaceAllString(jpgBasename, "${1}${2}")
-//	}
-//	return fmt.Sprintf("%s.jpg", jpgBasename)
-//}
 
 //func (jpg *Jpg) GetXmpPath(xmpDir string, rawExt string) string {
 //	// Check if there is a linked xmp
@@ -555,7 +555,7 @@ func FindXmp(path, sourcesDir, exportsDir string, extensions []string) (*Xmp, er
 	}
 	xmps := []*Xmp{xmp}
 	linkImages(raws, xmps, jpgs)
-	return &Xmp{}, nil
+	return xmp, nil
 }
 
 // FindRaw looks for a raw file at the specified path
@@ -578,11 +578,11 @@ func FindRaw(path, sourcesDir, exportsDir string) (*Raw, error) {
 	var jpgs []*Jpg
 	jpgPaths := FindFilesWithExt(jpgDir, ".jpg")
 	for _, jpgPath := range jpgPaths {
-		jpg := NewJpg(ImagePath{fullPath: jpgPath, basePath: sourcesDir})
+		jpg := NewJpg(ImagePath{fullPath: jpgPath, basePath: exportsDir})
 		jpgs = append(jpgs, jpg)
 	}
 	linkImages([]*Raw{raw}, xmps, jpgs)
-	return &Raw{}, nil
+	return raw, nil
 }
 
 // For each raw, find corresponding xmps and jpgs
@@ -718,27 +718,27 @@ func IsDir(path string) (bool, error) {
 //	}
 //}
 
-// GetRelativeDir returns the directory of fullPath relative to baseDir
-// E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "some/dir"
-func GetRelativeDir(fullPath, baseDir string) string {
-	isDir, err := IsDir(baseDir)
-	if err != nil {
-		log.Fatalf("Error getting relative dir for input path '%s': %v", baseDir, err)
-	}
-
-	if !isDir {
-		baseDir = filepath.Dir(baseDir)
-	}
-	relativePath, err := filepath.Rel(baseDir, fullPath)
-	if err != nil {
-		log.Fatalf("Error getting relative path for %s in %s, %v", fullPath, baseDir, err)
-	}
-	//for strings.HasPrefix(relativePath, "../") {
-	//	relativePath = strings.TrimPrefix(relativePath, "../")
-	//}
-	//fmt.Printf("trim '%s' off the front of '%s' => '%s'\n", baseDir, fullPath, relativePath)
-	return filepath.Dir(relativePath)
-}
+//// GetRelativeDir returns the directory of fullPath relative to baseDir
+//// E.g. GetRelativeDir("/mnt/some/dir/filename.txt", "/mnt") -> "some/dir"
+//func GetRelativeDir(fullPath, baseDir string) string {
+//	isDir, err := IsDir(baseDir)
+//	if err != nil {
+//		log.Fatalf("Error getting relative dir for input path '%s': %v", baseDir, err)
+//	}
+//
+//	if !isDir {
+//		baseDir = filepath.Dir(baseDir)
+//	}
+//	relativePath, err := filepath.Rel(baseDir, fullPath)
+//	if err != nil {
+//		log.Fatalf("Error getting relative path for %s in %s, %v", fullPath, baseDir, err)
+//	}
+//	//for strings.HasPrefix(relativePath, "../") {
+//	//	relativePath = strings.TrimPrefix(relativePath, "../")
+//	//}
+//	//fmt.Printf("trim '%s' off the front of '%s' => '%s'\n", baseDir, fullPath, relativePath)
+//	return filepath.Dir(relativePath)
+//}
 
 //func FindJpgsWithoutRaw(jpgs []string, raws []string, inputFolder, outputFolder string, rawExtensions []string) []string {
 //	relativeJpgs := make([]string, len(jpgs))
