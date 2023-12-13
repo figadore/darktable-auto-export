@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -40,7 +41,8 @@ func Export(params ExportParams) error {
 	}
 	// Write to tmp file since darktable cli creates a new file if target
 	// filename exists
-	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
+	tmpPath := fmt.Sprintf("%s.tmp.jpg", filepath.ToSlash(params.OutputPath))
+	// escape slashes on windows
 	args = append(args, tmpPath)
 	err = runCmd(args, params.DryRun, true)
 	if err != nil {
