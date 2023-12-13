@@ -71,6 +71,7 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 	var cmd *exec.Cmd
 	if dryRun {
 		fmt.Println(args)
+		return nil
 	} else {
 		cmd = exec.Command(args[0], remaining...)
 		stdout, err := cmd.CombinedOutput()
