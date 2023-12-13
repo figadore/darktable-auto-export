@@ -561,7 +561,7 @@ func jpgMatchesXmp(jpg *Jpg, xmp *Xmp) bool {
 	jpgRelativePath := jpg.Path.GetRelativePath()
 	base := xmp.Path.GetBasename()
 	relativeDir := xmp.Path.GetRelativeDir()
-	exp := regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s\.jpg$`, relativeDir, base))
+	exp := regexp.MustCompile(fmt.Sprintf(`^(%s[\\\/])?%s\.jpg$`, relativeDir, base))
 	if exp.Match([]byte(jpgRelativePath)) {
 		return true
 	}
@@ -574,22 +574,22 @@ func xmpMatchesRaw(xmp *Xmp, raw *Raw) bool {
 	ext := filepath.Ext(raw.GetPath())
 	dir := raw.Path.GetFullDir()
 	// basename.xmp
-	exp := regexp.MustCompile(fmt.Sprintf(`^%s/%s\.xmp$`, dir, base))
+	exp := regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s\.xmp$`, dir, base))
 	if exp.Match([]byte(xmpPath)) {
 		return true
 	}
 	// basename.ext.xmp
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s(?i)%s(?-i)\.xmp$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s(?i)%s(?-i)\.xmp$`, dir, base, ext))
 	if exp.Match([]byte(xmpPath)) {
 		return true
 	}
 	// basename_XX.xmp
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d\.xmp$`, dir, base))
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s_\d\d\.xmp$`, dir, base))
 	if exp.Match([]byte(xmpPath)) {
 		return true
 	}
 	// basename_XX.ext.xmp
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s/%s_\d\d(?i)%s(?-i)\.xmp$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s_\d\d(?i)%s(?-i)\.xmp$`, dir, base, ext))
 	if exp.Match([]byte(xmpPath)) {
 		return true
 	}
@@ -602,22 +602,22 @@ func jpgMatchesRaw(jpg *Jpg, raw *Raw) bool {
 	ext := filepath.Ext(raw.GetPath())
 	dir := raw.Path.GetRelativeDir()
 	// basename.jpg
-	exp := regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s\.jpg$`, dir, base))
+	exp := regexp.MustCompile(fmt.Sprintf(`^(%s[\\\/])?%s\.jpg$`, dir, base))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename.ext.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s(?i)%s(?-i)\.jpg$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s[\\\/])?%s(?i)%s(?-i)\.jpg$`, dir, base, ext))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename_XX.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s_\d\d\.jpg$`, dir, base))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s[\\\/])?%s_\d\d\.jpg$`, dir, base))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
 	// basename_XX.ext.jpg
-	exp = regexp.MustCompile(fmt.Sprintf(`^(%s/)?%s_\d\d(?i)%s(?-i)\.jpg$`, dir, base, ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^(%s[\\\/])?%s_\d\d(?i)%s(?-i)\.jpg$`, dir, base, ext))
 	if exp.Match([]byte(jpgPath)) {
 		return true
 	}
