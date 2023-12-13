@@ -73,21 +73,21 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 		fmt.Println(args)
 	} else {
 		cmd = exec.Command(args[0], remaining...)
-	}
-	stdout, err := cmd.CombinedOutput()
-	if len(stdout) != 0 {
-		if !dryRun {
-			fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
-		} else if prints {
-			fmt.Print(string(stdout))
+		stdout, err := cmd.CombinedOutput()
+		if len(stdout) != 0 {
+			if !dryRun {
+				fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+			} else if prints {
+				fmt.Print(string(stdout))
+			}
 		}
+		if err != nil {
+			fmt.Println("cmd error", err.Error())
+			fmt.Println("cmd err", err)
+			return err
+		}
+		return nil
 	}
-	if err != nil {
-		fmt.Println("cmd error", err.Error())
-		fmt.Println("cmd err", err)
-		return err
-	}
-	return nil
 }
 
 func GetModifiedDate(src string) (time.Time, error) {
