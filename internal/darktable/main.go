@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 )
 
 type ExportParams struct {
@@ -28,7 +27,8 @@ func Export(params ExportParams) error {
 			return e
 		}
 	}
-	args := strings.Fields(params.Command)
+
+	args := params.Command
 	args = append(args, params.RawPath)
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
