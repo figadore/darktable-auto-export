@@ -28,7 +28,7 @@ func Export(params ExportParams) error {
 		}
 	}
 
-	args := string[]{params.Command}
+	args := []string{params.Command}
 	args = append(args, params.RawPath)
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
