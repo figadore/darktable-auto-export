@@ -42,7 +42,7 @@ func Export(params ExportParams) error {
 	// filename exists
 	tmpPath := fmt.Sprintf("%s.tmp.jpg", params.OutputPath)
 	args = append(args, tmpPath)
-	err := runCmd(args, params.DryRun, true)
+	err = runCmd(args, params.DryRun, true)
 	if err != nil {
 		return err
 	}
