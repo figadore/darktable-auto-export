@@ -589,7 +589,7 @@ func xmpMatchesRaw(xmp *Xmp, raw *Raw) bool {
 		return true
 	}
 	// basename_XX.ext.xmp
-	exp = regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s_\d\d(?i)%s(?-i)\.xmp$`, regexp.QuoteMeta(dir), regexp.QuoteMeta(base), regexp.QuoteMeta(ext))
+	exp = regexp.MustCompile(fmt.Sprintf(`^%s[\\\/]%s_\d\d(?i)%s(?-i)\.xmp$`, regexp.QuoteMeta(dir), regexp.QuoteMeta(base), regexp.QuoteMeta(ext)))
 	if exp.Match([]byte(xmpPath)) {
 		return true
 	}
