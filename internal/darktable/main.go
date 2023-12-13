@@ -70,7 +70,8 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 	}
 	var cmd *exec.Cmd
 	if dryRun {
-		cmd = exec.Command("echo", args...)
+		//cmd = exec.Command("echo", args...)
+		fmt.Println(args...)
 	} else {
 		cmd = exec.Command(args[0], remaining...)
 	}
