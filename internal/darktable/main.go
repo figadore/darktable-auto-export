@@ -40,7 +40,7 @@ func Export(params ExportParams) error {
 	}
 	// Write to tmp file since darktable cli creates a new file if target
 	// filename exists
-	tmpPath := fmt.Sprintf("%s.tmp.jpg", fmt.Sprintf("\"%s\"", params.OutputPath)
+	tmpPath := fmt.Sprintf("%s.tmp.jpg", fmt.Sprintf("\"%s\"", params.OutputPath))
 	args = append(args, tmpPath)
 	err = runCmd(args, params.DryRun, true)
 	if err != nil {
@@ -70,7 +70,6 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 	}
 	var cmd *exec.Cmd
 	if dryRun {
-		//cmd = exec.Command("echo", args...)
 		fmt.Println(args...)
 	} else {
 		cmd = exec.Command(args[0], remaining...)
