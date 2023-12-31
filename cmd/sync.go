@@ -3,7 +3,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/figadore/darktable-auto-export/internal/darktable"
@@ -78,6 +81,15 @@ func syncDir() error {
 	outDir := viper.GetString("out")
 	extensions := viper.GetStringSlice("extension")
 	raws, _, jpgs := linkedimage.FindImages(inDir, outDir, extensions)
+	f, err := os.Create("runtime.prof")
+	if err != nil {
+		fmt.Println(err)
+		return nil
+	}
+	runtime.SetCPUProfileRate(1000)
+	pprof.StartCPUProfile(f)
+	fmt.Println("starting cpu profile")
+	defer pprof.StopCPUProfile()
 	for _, raw := range raws {
 		params := darktable.ExportParams{
 			Command: viper.GetString("command"),

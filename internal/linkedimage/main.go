@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/figadore/darktable-auto-export/internal/darktable"
 )
@@ -24,6 +25,7 @@ type Raw struct {
 	Jpgs   map[string]*Jpg
 	srcDir string // Base directory where source files are found
 	dstDir string // Base directory where exported image files are found
+	mu     sync.Mutex
 }
 
 func (i *Raw) GetPath() string {
@@ -76,10 +78,14 @@ func (raw Raw) String() string {
 func (raw *Raw) AddXmp(xmp *Xmp) {
 	// TODO validate pattern
 	// only add if it doesn't already exist
+	raw.mu.Lock()
+	defer raw.mu.Unlock()
 	if _, ok := raw.Xmps[xmp.GetPath()]; !ok {
 		raw.Xmps[xmp.GetPath()] = xmp
 		if xmp.Jpg != nil {
+			raw.mu.Unlock()
 			raw.AddJpg(xmp.Jpg)
+			raw.mu.Lock()
 		}
 		xmp.Raw = raw
 	}
@@ -87,7 +93,9 @@ func (raw *Raw) AddXmp(xmp *Xmp) {
 	if xmp.Jpg == nil && len(raw.Jpgs) > 0 {
 		for k := range raw.Jpgs {
 			if jpgMatchesXmp(raw.Jpgs[k], xmp) {
+				raw.mu.Unlock()
 				xmp.LinkJpg(raw.Jpgs[k])
+				raw.mu.Lock()
 			}
 		}
 	}
@@ -96,11 +104,15 @@ func (raw *Raw) AddXmp(xmp *Xmp) {
 func (raw *Raw) AddJpg(jpg *Jpg) {
 	// TODO validate pattern
 	raw.dstDir = jpg.Path.GetBaseDir()
+	raw.mu.Lock()
+	defer raw.mu.Unlock()
 	// only add if it doesn't already exist
 	if _, ok := raw.Jpgs[jpg.GetPath()]; !ok {
 		raw.Jpgs[jpg.GetPath()] = jpg
 		if jpg.Xmp != nil {
+			raw.mu.Unlock()
 			raw.AddXmp(jpg.Xmp)
+			raw.mu.Lock()
 		}
 		jpg.Raw = raw
 	}
@@ -108,7 +120,9 @@ func (raw *Raw) AddJpg(jpg *Jpg) {
 	if jpg.Xmp == nil && len(raw.Xmps) > 0 {
 		for k := range raw.Xmps {
 			if jpgMatchesXmp(jpg, raw.Xmps[k]) {
+				raw.mu.Unlock()
 				jpg.LinkXmp(raw.Xmps[k])
+				raw.mu.Lock()
 			}
 		}
 	}
@@ -529,32 +543,52 @@ func FindRaw(path, sourcesDir, exportsDir string) (*Raw, error) {
 // For each xmp, find corresponding jpgs and raws
 // For each jpg, find corresponding xmps and raws
 func linkImages(raws []*Raw, xmps []*Xmp, jpgs []*Jpg) {
+	//matchingXmps := make(chan *Xmp)
+	//matchingJpgs := make(chan *Jpg)
+	var wg sync.WaitGroup
 	for i, raw := range raws {
 		for j, xmp := range xmps {
-			if xmpMatchesRaw(xmp, raw) {
-				raws[i].AddXmp(xmps[j])
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if xmpMatchesRaw(xmp, raw) {
+					raws[i].AddXmp(xmps[j])
+				}
+			}()
 		}
 		for j, jpg := range jpgs {
-			if jpgMatchesRaw(jpg, raw) {
-				raws[i].AddJpg(jpgs[j])
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if jpgMatchesRaw(jpg, raw) {
+					raws[i].AddJpg(jpgs[j])
+				}
+			}()
 		}
 	}
 	for i, xmp := range xmps {
 		for j, jpg := range jpgs {
-			if jpgMatchesXmp(jpg, xmp) {
-				xmps[i].LinkJpg(jpgs[j])
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if jpgMatchesXmp(jpg, xmp) {
+					xmps[i].LinkJpg(jpgs[j])
+				}
+			}()
 		}
 	}
 	for i, jpg := range jpgs {
 		for j, raw := range raws {
-			if jpgMatchesRaw(jpg, raw) {
-				jpgs[i].LinkRaw(raws[j])
-			}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if jpgMatchesRaw(jpg, raw) {
+					jpgs[i].LinkRaw(raws[j])
+				}
+			}()
 		}
 	}
+	wg.Wait()
 }
 
 func jpgMatchesXmp(jpg *Jpg, xmp *Xmp) bool {
