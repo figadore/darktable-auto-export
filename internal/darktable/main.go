@@ -1,7 +1,6 @@
 package darktable
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -19,7 +18,7 @@ type ExportParams struct {
 	DryRun     bool   // Show actions that would be performed, but don't do them
 }
 
-func copyToLocal(src, dst string) error {
+func copyFile(src, dst string) error {
 	fmt.Printf("Copy from '%s' to '%s'\n", src, dst)
 	data, err := os.ReadFile(src)
 	if err != nil {
@@ -29,15 +28,15 @@ func copyToLocal(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	mTime, err := GetModifiedDate(src)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Updating modified time of '%s'\n", dst)
-	os.Chtimes(dst, mTime, mTime)
-	if err != nil {
-		return err
-	}
+	//mTime, err := GetModifiedDate(src)
+	//if err != nil {
+	//	return err
+	//}
+	//fmt.Printf("Updating modified time of '%s'\n", dst)
+	//os.Chtimes(dst, mTime, mTime)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -59,12 +58,10 @@ func Export(params ExportParams) error {
 	}
 
 	args := []string{params.Command}
-	h := sha256.New()
-	h.Write([]byte(params.RawPath))
-	bs := h.Sum(nil)
 
-	localRawPath := fmt.Sprintf("/tmp/%x.arw", bs[:4])
-	err := copyToLocal(params.RawPath, localRawPath)
+	// Copying files from network to local can improve performance quite a bit
+	localRawPath := filepath.Join(os.TempDir(), filepath.Base(params.RawPath))
+	err := copyFile(params.RawPath, localRawPath)
 	if err != nil {
 		return err
 	}
@@ -73,26 +70,37 @@ func Export(params ExportParams) error {
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
 	}
-	mTime, err := GetModifiedDate(params.OutputPath)
-	if err != nil {
-		return err
-	}
 	// Write to tmp file since darktable cli creates a new file if target
 	// filename exists
-	tmpPath := fmt.Sprintf("%s.tmp.jpg", filepath.ToSlash(params.OutputPath))
+	//tmpPath := fmt.Sprintf("%s.tmp.jpg", filepath.ToSlash(params.OutputPath))
 	// escape slashes on windows
-	args = append(args, tmpPath)
+	localJpgPath := filepath.Join(os.TempDir(), filepath.Base(params.OutputPath))
+	args = append(args, localJpgPath)
 	err = runCmd(args, params.DryRun, true)
 	if err != nil {
 		return err
 	}
+	if !params.DryRun {
+		defer deleteFile(localJpgPath)
+	}
 	// Try to edit in place, preserving existing photos so Synology doesn't
 	// remove them from albums
-	// FIXME not sure why this won't work with os.Chtimes and os.Rename, but
-	// Synology albums lost track of replaced images whenever I used a method
+	// Note: In the past, os.Rename and os.Chtimes were not enough to prevent
+	// Synology albums from losing track of replaced images. Meanwhile, runCmd
+	// with `cp -p` worked, but was not cross-platform
 	// other than these commands
-	os.Rename(tmpPath, params.OutputPath)
-	os.Chtimes(params.OutputPath, mTime, mTime)
+	mTime, err := GetModifiedDate(params.OutputPath)
+	if err != nil {
+		return err
+	}
+	err = copyFile(localJpgPath, params.OutputPath)
+	if err != nil {
+		return err
+	}
+	err = os.Chtimes(params.OutputPath, mTime, mTime)
+	if err != nil {
+		return err
+	}
 
 	//args = []string{"touch", "-r", params.OutputPath, tmpPath} //FIXME check for existence first
 	//runCmd(args, params.DryRun, false)
