@@ -1,6 +1,7 @@
 package darktable
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -18,6 +19,33 @@ type ExportParams struct {
 	DryRun     bool   // Show actions that would be performed, but don't do them
 }
 
+func copyToLocal(src, dst string) error {
+	fmt.Printf("Copy from '%s' to '%s'\n", src, dst)
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dst, data, 0666)
+	if err != nil {
+		return err
+	}
+	mTime, err := GetModifiedDate(src)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Updating modified time of '%s'\n", dst)
+	os.Chtimes(dst, mTime, mTime)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteFile(path string) error {
+	err := os.Remove(path)
+	return err
+}
+
 func Export(params ExportParams) error {
 	if params.OnlyNew {
 		if _, e := os.Stat(params.OutputPath); e == nil {
@@ -31,7 +59,17 @@ func Export(params ExportParams) error {
 	}
 
 	args := []string{params.Command}
-	args = append(args, params.RawPath)
+	h := sha256.New()
+	h.Write([]byte(params.RawPath))
+	bs := h.Sum(nil)
+
+	localRawPath := fmt.Sprintf("/tmp/%x.arw", bs[:4])
+	err := copyToLocal(params.RawPath, localRawPath)
+	if err != nil {
+		return err
+	}
+	defer deleteFile(localRawPath)
+	args = append(args, localRawPath)
 	if params.XmpPath != "" {
 		args = append(args, params.XmpPath)
 	}
