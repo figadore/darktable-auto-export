@@ -8,6 +8,7 @@ import (
 
 	"github.com/figadore/darktable-auto-export/internal/darktable"
 	"github.com/figadore/darktable-auto-export/internal/linkedimage"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -78,6 +79,7 @@ func syncDir() error {
 	outDir := viper.GetString("out")
 	extensions := viper.GetStringSlice("extension")
 	raws, _, jpgs := linkedimage.FindImages(inDir, outDir, extensions)
+	eg := errgroup.Group{}
 	for _, raw := range raws {
 		params := darktable.ExportParams{
 			Command: viper.GetString("command"),
@@ -85,10 +87,15 @@ func syncDir() error {
 			OnlyNew: viper.GetBool("new"),
 			DryRun:  viper.GetBool("dry-run"),
 		}
-		err := raw.Sync(params, viper.GetString("out"))
-		if err != nil {
+		fmt.Println("Starting error group sync")
+		eg.Go(func() error {
+			err := raw.Sync(params, viper.GetString("out"))
 			return err
-		}
+		})
+	}
+	err := eg.Wait()
+	if err != nil {
+		return err
 	}
 	// Delete jpgs with missing raws and xmps
 	if viper.GetBool("delete-missing") {
