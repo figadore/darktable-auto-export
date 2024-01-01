@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -19,7 +20,7 @@ type ExportParams struct {
 }
 
 func copyFile(src, dst string) error {
-	fmt.Printf("Copy from '%s' to '%s'\n", src, dst)
+	//fmt.Printf("Copy from '%s' to '%s'\n", src, dst)
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -125,7 +126,10 @@ func runCmd(args []string, dryRun bool, prints bool) error {
 		stdout, err := cmd.CombinedOutput()
 		if len(stdout) != 0 {
 			if !dryRun {
-				fmt.Print("=== Begin stdout/stderr ===\n", string(stdout), "\n=== End stdout/stderr ===\n")
+				// Remove warning about running as root
+				reg := regexp.MustCompile(`.*WARNING. either your user id or the effective user id are 0. are you running darktable as root.`)
+				prettierStdout := reg.ReplaceAllString(string(stdout), "")
+				fmt.Print("=== Begin stdout/stderr ===\n", prettierStdout, "\n=== End stdout/stderr ===\n")
 			} else if prints {
 				fmt.Print(string(stdout))
 			}
